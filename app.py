@@ -1,13 +1,22 @@
-# app.py
 import json
 from pathlib import Path
-
 import joblib
 import numpy as np
-from flask import Flask, render_template, request, jsonify
 import pandas as pd
-from flask import Flask
+from flask import Flask, render_template, request, jsonify
+import os
 
+# -------------------------------
+# Auto-train if model missing
+# -------------------------------
+if not Path("model_out/model_pipeline.pkl").exists():
+    from train import main
+    print("⚡ No trained model found, training now...")
+    main("landslide_dataset.csv", "Landslide", model_out_dir="model_out")
+
+# -------------------------------
+# Load Model + Metadata
+# -------------------------------
 MODEL_DIR = Path("model_out")
 MODEL_PIPELINE_PATH = MODEL_DIR / "model_pipeline.pkl"
 METADATA_PATH = MODEL_DIR / "metadata.json"
@@ -16,6 +25,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 
 if not MODEL_PIPELINE_PATH.exists():
     raise FileNotFoundError("Model pipeline not found. Run train.py first.")
+
 pipeline = joblib.load(MODEL_PIPELINE_PATH)
 with open(METADATA_PATH, "r") as f:
     metadata = json.load(f)
@@ -27,6 +37,9 @@ feature_values = metadata.get("feature_example_values", {})
 THRESHOLD_GREEN = 0.30
 THRESHOLD_YELLOW = 0.70
 
+# -------------------------------
+# Routes
+# -------------------------------
 @app.route("/")
 def index():
     feature_descriptors = []
@@ -48,6 +61,7 @@ def index():
         })
     return render_template("index.html", features=feature_descriptors)
 
+
 @app.route("/predict", methods=["POST"])
 def predict():
     data = request.json
@@ -59,6 +73,7 @@ def predict():
             row[f] = 0.0
     for f in categorical_feats:
         row[f] = data.get(f, None)
+
     df_row = pd.DataFrame([row])
 
     if hasattr(pipeline, "predict_proba"):
@@ -83,5 +98,10 @@ def predict():
         "message": message,
     })
 
+
+# -------------------------------
+# Run App (Render Compatible)
+# -------------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
