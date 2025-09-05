@@ -1,0 +1,61 @@
+{
+  "numeric_features": [
+    "Rainfall_mm",
+    "Slope_Angle",
+    "Soil_Saturation",
+    "Vegetation_Cover",
+    "Earthquake_Activity",
+    "Proximity_to_Water",
+    "Soil_Type_Gravel",
+    "Soil_Type_Sand",
+    "Soil_Type_Silt"
+  ],
+  "categorical_features": [],
+  "feature_example_values": {
+    "Rainfall_mm": {
+      "min": 50.0361507028,
+      "max": 299.919102159,
+      "mean": 176.6884615197695
+    },
+    "Slope_Angle": {
+      "min": 5.0039436145,
+      "max": 59.9667324336,
+      "mean": 29.98540403720225
+    },
+    "Soil_Saturation": {
+      "min": 0.0006522119,
+      "max": 0.9988312628,
+      "mean": 0.5403161533548501
+    },
+    "Vegetation_Cover": {
+      "min": 0.1000046539,
+      "max": 0.9998366026,
+      "mean": 0.5228617128466
+    },
+    "Earthquake_Activity": {
+      "min": 0.0016411578,
+      "max": 6.4986697355,
+      "mean": 3.6047707242377505
+    },
+    "Proximity_to_Water": {
+      "min": 0.0006533908,
+      "max": 1.9996356254,
+      "mean": 1.00186660509835
+    },
+    "Soil_Type_Gravel": {
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.2585
+    },
+    "Soil_Type_Sand": {
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.2415
+    },
+    "Soil_Type_Silt": {
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.261
+    }
+  }
+}
