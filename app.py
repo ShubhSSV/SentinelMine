@@ -9,24 +9,26 @@ import os
 # -------------------------------
 # Auto-train if model missing
 # -------------------------------
-if not Path("model_out/model_pipeline.pkl").exists():
+MODEL_DIR = Path("model_out")
+MODEL_PIPELINE_PATH = MODEL_DIR / "model_pipeline.pkl"
+METADATA_PATH = MODEL_DIR / "metadata.json"
+
+if not MODEL_PIPELINE_PATH.exists():
     from train import main
     print("⚡ No trained model found, training now...")
     main("landslide_dataset.csv", "Landslide", model_out_dir="model_out")
 
 # -------------------------------
-# Load Model + Metadata
+# Load Model + Metadata with Fallback
 # -------------------------------
-MODEL_DIR = Path("model_out")
-MODEL_PIPELINE_PATH = MODEL_DIR / "model_pipeline.pkl"
-METADATA_PATH = MODEL_DIR / "metadata.json"
+try:
+    pipeline = joblib.load(MODEL_PIPELINE_PATH)
+except Exception as e:
+    print("⚠️ Could not load model pickle, retraining due to:", e)
+    from train import main
+    main("landslide_dataset.csv", "Landslide", model_out_dir="model_out")
+    pipeline = joblib.load(MODEL_PIPELINE_PATH)
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
-
-if not MODEL_PIPELINE_PATH.exists():
-    raise FileNotFoundError("Model pipeline not found. Run train.py first.")
-
-pipeline = joblib.load(MODEL_PIPELINE_PATH)
 with open(METADATA_PATH, "r") as f:
     metadata = json.load(f)
 
@@ -38,8 +40,10 @@ THRESHOLD_GREEN = 0.30
 THRESHOLD_YELLOW = 0.70
 
 # -------------------------------
-# Routes
+# Flask App
 # -------------------------------
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
 @app.route("/")
 def index():
     feature_descriptors = []
