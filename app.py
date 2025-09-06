@@ -1,7 +1,7 @@
+#JAI SHREE GANESH
 import json
 from pathlib import Path
 import joblib
-import numpy as np
 import pandas as pd
 from flask import Flask, render_template, request, jsonify
 import os
@@ -69,23 +69,33 @@ def index():
 @app.route("/predict", methods=["POST"])
 def predict():
     data = request.json
-    row = {}
-    for f in numeric_feats:
+
+    # -------------------------------
+    # DEMO WEIGHTING LOGIC
+    # -------------------------------
+    weighting = {
+        "Rainfall_mm": 0.15,
+        "Slope_Angle": 0.10,
+        "Soil_Saturation": 0.20,
+        "Vegetation_Cover": -0.10,  # more vegetation = lower risk
+        "Earthquake_Activity": 0.30,
+        "Proximity_to_Water": 0.15,
+    }
+
+    demo_score = 0.0
+    for f, w in weighting.items():
         try:
-            row[f] = float(data.get(f, 0.0))
+            val = float(data.get(f, 0.0))
         except:
-            row[f] = 0.0
-    for f in categorical_feats:
-        row[f] = data.get(f, None)
+            val = 0.0
+        demo_score += (val / 100.0) * w
 
-    df_row = pd.DataFrame([row])
+    # Keep score between 0 and 1
+    proba = max(0.0, min(1.0, demo_score))
 
-    if hasattr(pipeline, "predict_proba"):
-        proba = pipeline.predict_proba(df_row)[:, 1][0]
-    else:
-        pred = pipeline.predict(df_row)[0]
-        proba = float(pred)
-
+    # -------------------------------
+    # Alerts
+    # -------------------------------
     if proba < THRESHOLD_GREEN:
         alert = "GREEN"
         message = "No immediate risk"
