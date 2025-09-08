@@ -14,8 +14,8 @@ warnings.filterwarnings("ignore")
 # -------------------------------
 # Config
 # -------------------------------
-DATA_CSV = Path("landslide_dataset.csv")  # global model dataset (if present)
-ZONE_CSV = Path("synthetic_mine_sensors_zones_6000.csv")  # zone dataset (if present)
+DATA_CSV = Path("landslide_dataset.csv")
+ZONE_CSV = Path("synthetic_mine_sensors_zones_6000.csv")
 TARGET_COL = "Landslide"
 MODEL_DIR = Path("model_out")
 MODEL_PIPELINE_PATH = MODEL_DIR / "model_pipeline.pkl"
@@ -25,19 +25,16 @@ ZONE_MODEL_DIR = Path("model_out_zone")
 ZONE_MODEL_PATH = ZONE_MODEL_DIR / "model_pipeline_zone.pkl"
 ZONE_METADATA_PATH = ZONE_MODEL_DIR / "metadata_zone.json"
 
-# Global blend factor (keep original default behavior for global)
 GLOBAL_BLEND_ALPHA = float(os.environ.get("BLEND_ALPHA_GLOBAL", 0.6))
-# Zone blend factor (favor zone-trained model more)
 ZONE_BLEND_ALPHA = float(os.environ.get("BLEND_ALPHA_ZONE", 0.85))
 
 THRESHOLD_GREEN = 0.30
 THRESHOLD_YELLOW = 0.70
 
-# Default zones
 DEFAULT_ZONES = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 # -------------------------------
-# Auto-train global model if missing (keeps your existing behavior)
+# Auto-train global model if missing (keeps behavior)
 # -------------------------------
 if not MODEL_PIPELINE_PATH.exists():
     if DATA_CSV.exists():
@@ -51,7 +48,7 @@ if not MODEL_PIPELINE_PATH.exists():
         print("❗ No global model and no dataset found. Running in demo-only mode for global predictions.")
 
 # -------------------------------
-# Load pipelines (global + zone)
+# Load pipelines
 # -------------------------------
 pipeline = None
 if MODEL_PIPELINE_PATH.exists():
@@ -71,7 +68,7 @@ if ZONE_MODEL_PATH.exists():
         print("⚠️ Could not load zone model pipeline:", e)
         zone_pipeline = None
 
-# optionally auto-train zone model on first start if CSV present and zone model missing
+# optionally auto-train zone model
 if not ZONE_MODEL_PATH.exists() and ZONE_CSV.exists():
     try:
         print("⚡ Zone model missing and zone CSV present — training zone model now...")
@@ -93,18 +90,13 @@ if METADATA_PATH.exists():
     categorical_feats = metadata.get("categorical_features", [])
     feature_values = metadata.get("feature_example_values", {})
 else:
-    # reasonable defaults if metadata missing
     numeric_feats = ["Rainfall_mm", "Slope_Angle", "Soil_Saturation",
                      "Vegetation_Cover", "Earthquake_Activity", "Proximity_to_Water"]
     categorical_feats = []
     feature_values = {}
 
 # -------------------------------
-# === RESTORE ORIGINAL GLOBAL WEIGHT DERIVATION ===
-# This replicates the earlier (original) behavior you had before we tried the new unified method:
-# - compute Pearson corr of each numeric feature with the target in DATA_CSV
-# - derive absolute-correlation normalized weights and sign
-# - minmax_map holds min/max for normalization
+# Restore original global weight derivation
 # -------------------------------
 global_feature_weights = {}
 global_feature_sign = {}
@@ -119,7 +111,6 @@ if DATA_CSV.exists():
             for f in numeric_feats:
                 if f in df_raw.columns:
                     s = pd.to_numeric(df_raw[f], errors='coerce')
-                    # min/max
                     try:
                         minv = float(np.nanmin(s))
                         maxv = float(np.nanmax(s))
@@ -148,9 +139,8 @@ if DATA_CSV.exists():
                 for f, v in abs_corrs.items():
                     global_feature_weights[f] = v / total
                     global_feature_sign[f] = 1 if corr_map[f] >= 0 else -1
-            print("✅ Restored global weights (original method):", global_feature_weights)
+            print("✅ Restored global weights (original method).")
         else:
-            # fallback uniform
             n = len(numeric_feats) if numeric_feats else 1
             for f in numeric_feats:
                 global_feature_weights[f] = 1.0 / n
@@ -165,7 +155,6 @@ if DATA_CSV.exists():
             global_feature_sign[f] = 1
             global_minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
 else:
-    # no dataset: uniform
     n = len(numeric_feats) if numeric_feats else 1
     for f in numeric_feats:
         global_feature_weights[f] = 1.0 / n
@@ -173,7 +162,6 @@ else:
         global_minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
     print("⚠️ No DATA_CSV: global weights uniform fallback.")
 
-# Ensure defaults exist
 for f in numeric_feats:
     if f not in global_minmax_map:
         global_minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
@@ -183,9 +171,7 @@ for f in numeric_feats:
         global_feature_sign[f] = 1
 
 # -------------------------------
-# === ZONE-SPECIFIC IMPROVED WEIGHTS & MINMAX (correlation + variance) ===
-# This will be used only for zone demo scoring (and to help zone model blending).
-# Also optionally boost Earthquake_Activity influence.
+# Zone: improved weights (corr+var) and minmax
 # -------------------------------
 zone_feature_weights = {}
 zone_feature_sign = {}
@@ -203,22 +189,20 @@ def safe_stats_series(s):
 if ZONE_CSV.exists():
     try:
         df_z = pd.read_csv(ZONE_CSV)
-        # We'll try to compute stats by using the numeric_feats that exist in the zone CSV
         corr_map = {}
         var_map = {}
+        # detect potential target in zone CSV
+        possible_targets = [c for c in df_z.columns if c.lower() in ("landslide","risk","label","event_label","zone_risk")]
         for f in numeric_feats:
             if f in df_z.columns:
                 s = pd.to_numeric(df_z[f], errors='coerce')
                 stats = safe_stats_series(s)
                 zone_minmax_map[f] = {"min": stats["min"], "max": stats["max"], "mean": stats["mean"]}
                 var_map[f] = stats["var"]
-                # If the zone CSV has a target-like column, try to correlate; else leave corr 0
-                possible_targets = [c for c in df_z.columns if c.lower() in ("landslide","risk","label","event_label","zone_risk")]
                 corr = 0.0
-                if len(possible_targets) > 0:
+                if possible_targets:
                     try:
-                        tcol = possible_targets[0]
-                        tc = pd.to_numeric(df_z[tcol], errors='coerce')
+                        tc = pd.to_numeric(df_z[possible_targets[0]], errors='coerce')
                         corr = float(s.corr(tc))
                         if np.isnan(corr):
                             corr = 0.0
@@ -229,10 +213,8 @@ if ZONE_CSV.exists():
                 zone_minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
                 corr_map[f] = 0.0
                 var_map[f] = 0.0
-
         abs_corrs = {f: abs(v) for f, v in corr_map.items()}
         total_var = sum(var_map.values())
-
         combined = {}
         for f in numeric_feats:
             corr_term = abs_corrs.get(f, 0.0)
@@ -242,7 +224,6 @@ if ZONE_CSV.exists():
             else:
                 combined_val = corr_term + 0.01 * var_term
             combined[f] = combined_val
-
         tot = sum(combined.values())
         if tot <= 0:
             n = len(numeric_feats) if numeric_feats else 1
@@ -253,17 +234,14 @@ if ZONE_CSV.exists():
             for f, v in combined.items():
                 zone_feature_weights[f] = v / tot
                 zone_feature_sign[f] = 1 if corr_map.get(f, 0.0) >= 0 else -1
-
-        # Boost earthquake influence by a floor (if present) to make zone sensitivity stronger
+        # boost earthquake influence floor
         if "Earthquake_Activity" in zone_feature_weights:
             zone_feature_weights["Earthquake_Activity"] = max(zone_feature_weights.get("Earthquake_Activity", 0.0), 0.12)
-            # renormalize
             s = sum(zone_feature_weights.values())
             if s > 0:
                 for k in zone_feature_weights:
                     zone_feature_weights[k] /= s
-
-        print("✅ Derived zone weights (improved):", zone_feature_weights)
+        print("✅ Derived zone weights.")
     except Exception as ex:
         print("⚠️ Could not compute zone stats:", ex)
         n = len(numeric_feats) if numeric_feats else 1
@@ -272,7 +250,6 @@ if ZONE_CSV.exists():
             zone_feature_sign[f] = 1
             zone_minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
 else:
-    # fallback
     n = len(numeric_feats) if numeric_feats else 1
     for f in numeric_feats:
         zone_feature_weights[f] = 1.0 / n
@@ -289,12 +266,9 @@ for f in numeric_feats:
         zone_feature_sign[f] = 1
 
 # -------------------------------
-# Demo scoring functions:
-# - compute_demo_score_global: restores the old behavior (original)
-# - compute_demo_score_zone: improved scoring used for zones
+# Demo scoring functions
 # -------------------------------
 def compute_demo_score_global(input_values: dict) -> float:
-    """Original-style demo scoring using global_feature_weights and global_minmax_map."""
     score = 0.0
     for f, w in global_feature_weights.items():
         if w <= 0:
@@ -309,7 +283,6 @@ def compute_demo_score_global(input_values: dict) -> float:
                 val = 0.0
         mm = global_minmax_map.get(f, {"min": 0.0, "max": 1.0})
         minv, maxv = mm["min"], mm["max"]
-        # If slider in 0..100 and max-min != 100, treat it as percent of range
         if 0 <= val <= 100 and (maxv - minv) != 100:
             val_actual = minv + (val / 100.0) * (maxv - minv)
         else:
@@ -326,7 +299,6 @@ def compute_demo_score_global(input_values: dict) -> float:
     return float(max(0.0, min(1.0, score)))
 
 def compute_demo_score_zone(input_values: dict) -> float:
-    """Improved zone demo scoring using zone_feature_weights and zone_minmax_map."""
     score = 0.0
     for f, w in zone_feature_weights.items():
         if w <= 0:
@@ -357,7 +329,60 @@ def compute_demo_score_zone(input_values: dict) -> float:
     return float(max(0.0, min(1.0, score)))
 
 # -------------------------------
-# Flask App + routes
+# Extreme-scaling helper
+# -------------------------------
+def scale_to_endpoints(value, low_val, high_val, out_low=0.01, out_high=0.99):
+    # Map value from [low_val, high_val] -> [out_low, out_high] linearly
+    if high_val <= low_val:
+        return max(out_low, min(out_high, value))
+    t = (value - low_val) / (high_val - low_val)
+    return float(max(out_low, min(out_high, out_low + t * (out_high - out_low))))
+
+def compute_extremes_for_row(row_builder, model_predict_fn, demo_score_fn, alpha):
+    """
+    row_builder(sign) -> dict mapping features to either ideal/worst values
+      sign: 'ideal' or 'worst'
+    model_predict_fn(row_dict) -> model_proba (or None)
+    demo_score_fn(row_dict) -> demo_proba
+    returns tuple (combined_proba_for_extreme)
+    """
+    row = row_builder()
+    demo = demo_score_fn(row)
+    model_p = None
+    if model_predict_fn is not None:
+        try:
+            model_p = model_predict_fn(row)
+        except Exception:
+            model_p = None
+    if model_p is None:
+        return demo
+    return float(max(0.0, min(1.0, alpha * model_p + (1.0 - alpha) * demo)))
+
+def build_extreme_row(sign, minmax_map, feature_sign_map):
+    """
+    sign == 'ideal' -> choose per-feature value that reduces risk
+    sign == 'worst' -> choose per-feature value that increases risk
+    For features with positive direction (feature_sign=+1), ideal -> min, worst -> max
+    For features with negative direction, ideal -> max, worst -> min
+    """
+    row = {}
+    for f in numeric_feats:
+        mm = minmax_map.get(f, {"min": 0.0, "max": 1.0})
+        if feature_sign_map.get(f, 1) >= 0:
+            if sign == 'ideal':
+                row[f] = mm["min"]
+            else:
+                row[f] = mm["max"]
+        else:
+            # negative sign: higher value reduces risk
+            if sign == 'ideal':
+                row[f] = mm["max"]
+            else:
+                row[f] = mm["min"]
+    return row
+
+# -------------------------------
+# Flask app
 # -------------------------------
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -397,29 +422,62 @@ def zones():
     return jsonify({"zones": zones, "features": [f for f in numeric_feats]})
 
 # -------------------------------
-# Prediction logic (global uses original compute_demo_score_global;
-# zone-mode uses compute_demo_score_zone and prefers zone model)
+# Prediction: global and zone with endpoint-scaling to 1%..99%
 # -------------------------------
+def model_predict_global_row(row):
+    if pipeline is None:
+        return None
+    try:
+        df_row = pd.DataFrame([row])
+        if hasattr(pipeline, "predict_proba"):
+            return float(pipeline.predict_proba(df_row)[:, 1][0])
+        else:
+            return float(pipeline.predict(df_row)[0])
+    except Exception:
+        return None
+
+def model_predict_zone_row(row):
+    if zone_pipeline is not None:
+        try:
+            df_row = pd.DataFrame([row])
+            if hasattr(zone_pipeline, "predict_proba"):
+                return float(zone_pipeline.predict_proba(df_row)[:, 1][0])
+            else:
+                return float(zone_pipeline.predict(df_row)[0])
+        except Exception:
+            return None
+    # fallback to global model
+    return model_predict_global_row(row)
+
 def _predict_single_row(input_dict: dict):
-    df_row = pd.DataFrame([input_dict])
+    # compute raw model & demo probabilities
     model_proba = None
     if pipeline is not None:
         try:
-            if hasattr(pipeline, "predict_proba"):
-                model_proba = float(pipeline.predict_proba(df_row)[:, 1][0])
-            else:
-                model_proba = float(pipeline.predict(df_row)[0])
-        except Exception as e:
-            print("⚠️ Global model prediction failed:", e)
+            model_proba = model_predict_global_row(input_dict)
+        except Exception:
             model_proba = None
-
     demo_proba = compute_demo_score_global(input_dict)
 
+    # blended
     if model_proba is None:
-        final_proba = demo_proba
+        blended = demo_proba
     else:
-        alpha = GLOBAL_BLEND_ALPHA
-        final_proba = float(max(0.0, min(1.0, alpha * model_proba + (1.0 - alpha) * demo_proba)))
+        blended = float(max(0.0, min(1.0, GLOBAL_BLEND_ALPHA * model_proba + (1.0 - GLOBAL_BLEND_ALPHA) * demo_proba)))
+
+    # compute extremes (ideal & worst) using same logic
+    def row_builder_ideal():
+        return build_extreme_row('ideal', global_minmax_map, global_feature_sign)
+    def row_builder_worst():
+        return build_extreme_row('worst', global_minmax_map, global_feature_sign)
+
+    ideal_combined = compute_extremes_for_row(row_builder_ideal, model_predict_global_row if pipeline is not None else None, compute_demo_score_global, GLOBAL_BLEND_ALPHA)
+    worst_combined = compute_extremes_for_row(row_builder_worst, model_predict_global_row if pipeline is not None else None, compute_demo_score_global, GLOBAL_BLEND_ALPHA)
+
+    # scale blended to [0.01,0.99] using these extremes
+    scaled = scale_to_endpoints(blended, ideal_combined, worst_combined, out_low=0.01, out_high=0.99)
+
+    final_proba = float(max(0.01, min(0.99, scaled)))
 
     if final_proba < THRESHOLD_GREEN:
         alert = "GREEN"; message = "No immediate risk"
@@ -431,8 +489,10 @@ def _predict_single_row(input_dict: dict):
     debug = {
         "model_proba": None if model_proba is None else float(model_proba),
         "demo_proba": float(demo_proba),
-        "final_proba": float(final_proba),
-        "weights": global_feature_weights
+        "blended_raw": float(blended),
+        "ideal_extreme": float(ideal_combined),
+        "worst_extreme": float(worst_combined),
+        "final_proba": float(final_proba)
     }
 
     return {
@@ -454,49 +514,44 @@ def predict():
             is_zone_mode = True
 
     if not is_zone_mode:
-        result = _predict_single_row(data)
-        return jsonify(result)
+        return jsonify(_predict_single_row(data))
 
-    # zone-mode: evaluate each zone separately using zone scoring and zone model (if exists)
+    # zone-mode
     results = {}
     max_proba = -1.0
     max_zone = None
+
+    # precompute zone extremes using zone maps (if zone model exists prefer it)
+    def zone_model_fn(row):
+        return model_predict_zone_row(row)
+
     for zone, readings in data.items():
         if not isinstance(readings, dict):
             continue
 
-        model_proba = None
-        # try zone-specific model first
-        if zone_pipeline is not None:
-            try:
-                df_row = pd.DataFrame([readings])
-                if hasattr(zone_pipeline, "predict_proba"):
-                    model_proba = float(zone_pipeline.predict_proba(df_row)[:, 1][0])
-                else:
-                    model_proba = float(zone_pipeline.predict(df_row)[0])
-            except Exception as e:
-                print(f"⚠️ Zone model prediction failed for {zone}:", e)
-                model_proba = None
+        # model prob (prefer zone_pipeline)
+        model_p = None
+        try:
+            model_p = model_predict_zone_row(readings)
+        except Exception:
+            model_p = None
 
-        # fallback to global model if zone model not available
-        if model_proba is None and pipeline is not None:
-            try:
-                df_row = pd.DataFrame([readings])
-                if hasattr(pipeline, "predict_proba"):
-                    model_proba = float(pipeline.predict_proba(df_row)[:, 1][0])
-                else:
-                    model_proba = float(pipeline.predict(df_row)[0])
-            except Exception:
-                model_proba = None
+        demo_p = compute_demo_score_zone(readings)
 
-        demo_proba = compute_demo_score_zone(readings)
-
-        # blend using zone alpha (favor model more if available)
-        if model_proba is None:
-            final_proba = demo_proba
+        if model_p is None:
+            blended = demo_p
         else:
-            alpha = ZONE_BLEND_ALPHA
-            final_proba = float(max(0.0, min(1.0, alpha * model_proba + (1.0 - alpha) * demo_proba)))
+            blended = float(max(0.0, min(1.0, ZONE_BLEND_ALPHA * model_p + (1.0 - ZONE_BLEND_ALPHA) * demo_p)))
+
+        # build extremes for zone using zone_minmax_map & zone_feature_sign
+        ideal_row = build_extreme_row('ideal', zone_minmax_map, zone_feature_sign)
+        worst_row = build_extreme_row('worst', zone_minmax_map, zone_feature_sign)
+
+        ideal_combined = compute_extremes_for_row(lambda: ideal_row, zone_model_fn if zone_pipeline is not None or pipeline is not None else None, compute_demo_score_zone, ZONE_BLEND_ALPHA)
+        worst_combined = compute_extremes_for_row(lambda: worst_row, zone_model_fn if zone_pipeline is not None or pipeline is not None else None, compute_demo_score_zone, ZONE_BLEND_ALPHA)
+
+        scaled = scale_to_endpoints(blended, ideal_combined, worst_combined, out_low=0.01, out_high=0.99)
+        final_proba = float(max(0.01, min(0.99, scaled)))
 
         if final_proba < THRESHOLD_GREEN:
             alert = "GREEN"; message = f"Zone {zone}: सुरक्षित क्षेत्र (Safe Zone)"
@@ -509,9 +564,11 @@ def predict():
             "probability": float(final_proba),
             "alert": alert,
             "message": message,
-            "sms_preview": f"Mine Alert: {alert} in Zone {zone}. {message}",
-            "debug": {"model_proba": None if model_proba is None else float(model_proba),
-                      "demo_proba": float(demo_proba)}
+            "debug": {"model_proba": None if model_p is None else float(model_p),
+                      "demo_proba": float(demo_p),
+                      "blended_raw": float(blended),
+                      "ideal_extreme": float(ideal_combined),
+                      "worst_extreme": float(worst_combined)}
         }
 
         if final_proba > max_proba:
