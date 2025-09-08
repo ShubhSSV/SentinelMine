@@ -11,6 +11,15 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+# auto-train zone model if missing
+ZONE_MODEL_DIR = Path("model_out_zone")
+ZONE_MODEL_PATH = ZONE_MODEL_DIR / "model_pipeline_zone.pkl"
+
+if not ZONE_MODEL_PATH.exists() and Path("synthetic_mine_sensors_zones_6000.csv").exists():
+    print("⚡ Training zone model (first-time deploy)...")
+    from train_zone import main as train_zone_main
+    train_zone_main("synthetic_mine_sensors_zones_6000.csv", None, str(ZONE_MODEL_DIR))
+
 # -------------------------------
 # Config (unchanged core behavior)
 # -------------------------------
@@ -173,6 +182,16 @@ def index():
 
     # pass zones to template (new but non-destructive)
     return render_template("index.html", features=feature_descriptors, zones=ZONES)
+
+@app.route("/zones")
+def zones():
+    """Return available zones dynamically from dataset"""
+    zones = []
+    if Path("synthetic_mine_sensors_zones_6000.csv").exists():
+        df = pd.read_csv("synthetic_mine_sensors_zones_6000.csv")
+        if "Zone" in df.columns:
+            zones = sorted(df["Zone"].unique().tolist())
+    return jsonify({"zones": zones, "features": numeric_feats})
 
 
 def compute_demo_score(input_values: dict) -> float:
