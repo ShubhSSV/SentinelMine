@@ -4,7 +4,6 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-
   <meta charset="utf-8">
   <title>SmartWear — AI Disaster Risk Prediction</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
@@ -20,6 +19,11 @@
     .red { background:#e74c3c; }
     .led { display:inline-block; width:18px; height:18px; border-radius:50%; margin-right:8px; vertical-align:middle; }
     #history { margin-top:30px; }
+    .zone { display:inline-block; width:100px; height:100px; margin:8px; text-align:center; line-height:100px; border-radius:8px; font-weight:bold; background:#8fbc8f; }
+    .zone.green { background:#8fbc8f; }
+    .zone.yellow { background:#ffd700; color:#000; }
+    .zone.red { background:#ff4c4c; }
+    .zone-panel { border:1px solid #ddd; padding:10px; border-radius:8px; margin-bottom:12px; background:#fff;}
   </style>
 </head>
 <body>
@@ -27,43 +31,83 @@
   <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
       <a class="navbar-brand">🌍 SmartWear Risk Monitor</a>
+      <div class="ms-auto text-white">
+        Mode:
+        <div class="btn-group btn-group-sm" role="group" aria-label="mode">
+          <input type="radio" class="btn-check" name="mode" id="modeGlobal" autocomplete="off" checked>
+          <label class="btn btn-outline-light btn-sm" for="modeGlobal" id="lblGlobal">Global</label>
+          <input type="radio" class="btn-check" name="mode" id="modeZone" autocomplete="off">
+          <label class="btn btn-outline-light btn-sm" for="modeZone" id="lblZone">Zone</label>
+        </div>
+      </div>
     </div>
   </nav>
 
   <div class="container mt-4">
-    <div class="row">
-      <!-- Input section -->
-      <div class="col-md-6">
-        <h4 class="mb-3">⚙️ Sensor Controls</h4>
-        <div class="row" id="form"></div>
-      </div>
+    <div id="globalUI">
+      <div class="row">
+        <!-- Input section -->
+        <div class="col-md-6">
+          <h4 class="mb-3">⚙️ Sensor Controls (Global)</h4>
+          <div class="row" id="form"></div>
+        </div>
 
-      <!-- Output section -->
-      <div class="col-md-6">
-        <h4 class="mb-3">📊 Prediction Result</h4>
-        <div id="output" style="display:none;">
-          <div id="alertBox" class="result-box">
-            <div><span id="led" class="led"></span><span id="alertText"></span></div>
-            <h5 id="messageText" class="mt-2"></h5>
-            <canvas id="gaugeChart" width="200" height="200"></canvas>
-            <p class="mt-2">Risk Probability: <span id="probVal"></span></p>
+        <!-- Output section -->
+        <div class="col-md-6">
+          <h4 class="mb-3">📊 Prediction Result (Global)</h4>
+          <div id="output" style="display:none;">
+            <div id="alertBox" class="result-box">
+              <div><span id="led" class="led"></span><span id="alertText"></span></div>
+              <h5 id="messageText" class="mt-2"></h5>
+              <canvas id="gaugeChart" width="200" height="200"></canvas>
+              <p class="mt-2">Risk Probability: <span id="probVal"></span></p>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- History section -->
+      <div id="history">
+        <h4 class="mt-4">📜 Prediction History</h4>
+        <ul class="list-group" id="historyList"></ul>
+      </div>
     </div>
 
-    <!-- History section -->
-    <div id="history">
-      <h4 class="mt-4">📜 Prediction History</h4>
-      <ul class="list-group" id="historyList"></ul>
+    <!-- Zone UI (hidden by default) -->
+    <div id="zoneUI" style="display:none;">
+      <div class="row">
+        <div class="col-md-7">
+          <h4>🗺️ Mine Zones</h4>
+          <div id="zoneMap" class="mb-3">
+            {% for z in zones %}
+              <div id="zone_{{z}}" class="zone green">{{z}}</div>
+            {% endfor %}
+          </div>
+
+          <h5>Zone Controls</h5>
+          <div id="zonesControls"></div>
+          <button class="btn btn-primary mt-2" id="btnPredictZones">Predict Zones</button>
+        </div>
+
+        <div class="col-md-5">
+          <h4>Alerts & SMS</h4>
+          <div id="zoneAlertsBox" class="zone-panel">--</div>
+          <h5 class="mt-3">SMS Preview</h5>
+          <pre id="zoneSmsBox">--</pre>
+
+          <h5 class="mt-3">Zone History</h5>
+          <ul class="list-group" id="zoneHistory"></ul>
+        </div>
+      </div>
     </div>
   </div>
 
 <script>
 const features = {{ features|tojson }};
+const zones = {{ zones|tojson }};
 const formDiv = document.getElementById('form');
 
-// Create cards for each feature
+// Build Global UI (unchanged)
 features.forEach(f => {
   const col = document.createElement('div');
   col.className = 'col-md-6';
@@ -111,24 +155,14 @@ features.forEach(f => {
   formDiv.appendChild(col);
 });
 
-// Chart.js gauge (donut)
+// Chart.js gauge (unchanged)
 let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
   type: 'doughnut',
-  data: {
-    labels: ['Risk', 'Safe'],
-    datasets: [{
-      data: [0, 100],
-      backgroundColor: ['#e74c3c', '#bdc3c7'],
-      borderWidth: 0
-    }]
-  },
-  options: {
-    cutout: '70%',
-    plugins: { legend: { display: false } }
-  }
+  data: { labels: ['Risk', 'Safe'], datasets: [{ data: [0, 100], backgroundColor: ['#e74c3c', '#bdc3c7'], borderWidth: 0 }]},
+  options: { cutout: '70%', plugins: { legend: { display: false } } }
 });
 
-// Prediction function
+// GLOBAL prediction (existing functionality)
 async function makePredict() {
   const payload = {};
   features.forEach(f => {
@@ -166,7 +200,6 @@ async function makePredict() {
     alertText.innerText = ' HIGH RISK';
   }
 
-  // Update gauge
   gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100];
   gaugeChart.update();
 
@@ -177,6 +210,98 @@ async function makePredict() {
   document.getElementById('historyList').prepend(li);
 }
 
+// Build Zone controls (new) - hidden until zone mode selected
+const zonesControls = document.getElementById('zonesControls');
+zones.forEach(z => {
+  const box = document.createElement('div');
+  box.className = 'zone-panel';
+  box.id = `panel_${z}`;
+  box.innerHTML = `<h5>Zone ${z}</h5>`;
+  features.forEach(f => {
+    const label = document.createElement('label');
+    label.innerHTML = f + ': ';
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.min = 0; slider.max = 100; slider.value = 50;
+    slider.id = `${z}__${f}`;
+    label.appendChild(slider);
+    box.appendChild(label);
+    box.appendChild(document.createElement('br'));
+  });
+  zonesControls.appendChild(box);
+});
+
+// Zone prediction handler
+async function predictZones() {
+  const payload = {};
+  zones.forEach(z => {
+    payload[z] = {};
+    features.forEach(f => {
+      const el = document.getElementById(`${z}__${f}`);
+      payload[z][f] = el ? parseFloat(el.value) : 0.0;
+    });
+  });
+
+  const res = await fetch('/predict', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const j = await res.json();
+  // j: { zones: { zoneName: {probability, alert, message, sms_preview, debug}}, summary: {...} }
+
+  // Update zone map colors & alerts area
+  const zoneAlerts = [];
+  let smsAll = '';
+  for (const z of Object.keys(j.zones)) {
+    const r = j.zones[z];
+    const dom = document.getElementById(`zone_${z}`);
+    if (dom) {
+      dom.className = 'zone ' + r.alert.toLowerCase();
+    }
+    zoneAlerts.push(`${r.message} (Risk: ${(r.probability*100).toFixed(1)}%)`);
+    smsAll += r.sms_preview + '\n';
+
+    // push to zone history
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
+    li.innerText = `${new Date().toLocaleTimeString()} — ${z} → ${r.alert} (${(r.probability*100).toFixed(1)}%)`;
+    document.getElementById('zoneHistory').prepend(li);
+  }
+  document.getElementById('zoneAlertsBox').innerHTML = zoneAlerts.join('<br>');
+  document.getElementById('zoneSmsBox').innerText = smsAll;
+
+  // Play voice for any RED zones (Hindi if supported)
+  for (const z of Object.keys(j.zones)) {
+    const r = j.zones[z];
+    if (r.alert === 'RED') {
+      const msg = r.message + ` Zone ${z}.`;
+      try {
+        const utter = new SpeechSynthesisUtterance(msg);
+        // try to use a Hindi voice if available
+        const voices = speechSynthesis.getVoices();
+        const hindi = voices.find(v => /hi|hindi/i.test(v.lang + v.name));
+        if (hindi) utter.voice = hindi;
+        utter.rate = 0.9;
+        speechSynthesis.speak(utter);
+      } catch (e) { /* ignore speech errors */ }
+    }
+  }
+}
+
+// Hook up zone predict button
+document.getElementById('btnPredictZones').addEventListener('click', predictZones);
+
+// Mode toggle handlers
+document.getElementById('modeGlobal').addEventListener('change', () => {
+  document.getElementById('globalUI').style.display = 'block';
+  document.getElementById('zoneUI').style.display = 'none';
+});
+document.getElementById('modeZone').addEventListener('change', () => {
+  document.getElementById('globalUI').style.display = 'none';
+  document.getElementById('zoneUI').style.display = 'block';
+});
+
+// Initial global prediction on load
 makePredict();
 </script>
 </body>
