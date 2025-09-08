@@ -13,14 +13,16 @@
     .navbar { background:#2c3e50; }
     .navbar-brand { color:#fff !important; font-weight:600; }
     .feature-card { padding:12px 14px; margin:8px 0; border-radius:10px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.06);}
-    .result-box { padding:18px; border-radius:12px; color:#fff; text-align:center; margin-top:10px; }
+    .result-box { padding:18px; border-radius:12px; color:#fff; text-align:center; margin-top:10px; transition: all 300ms ease; }
     .green { background:#27ae60; }
     .yellow { background:#f1c40f; color:#000; }
     .red { background:#e74c3c; }
-    .led { display:inline-block; width:14px; height:14px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+    .led { display:inline-block; width:14px; height:14px; border-radius:50%; margin-right:8px; vertical-align:middle; transition: background 300ms ease; }
     .zone-panel { background:#fff; padding:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:16px; }
     .slider-value { margin-left:8px; font-weight:600; color:#2c3e50; }
     .zone-title { font-weight:700; margin-bottom:8px; }
+    .fade-in { animation: fadeIn 400ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity:1; transform:none; } }
   </style>
 </head>
 <body>
@@ -40,7 +42,7 @@
   </nav>
 
   <div class="container mt-4">
-    <!-- GLOBAL MODE (original layout: sliders left, chart+history right) -->
+    <!-- GLOBAL MODE -->
     <div id="globalUI">
       <div class="row">
         <div class="col-md-6">
@@ -51,7 +53,7 @@
         <div class="col-md-6">
           <h4>📊 Prediction Result (Global)</h4>
           <div id="output" style="display:none;">
-            <div id="alertBox" class="result-box">
+            <div id="alertBox" class="result-box fade-in">
               <div><span id="led" class="led"></span><span id="alertText"></span></div>
               <h5 id="messageText" class="mt-2"></h5>
               <canvas id="gaugeChart" width="250" height="250"></canvas>
@@ -59,192 +61,179 @@
             </div>
           </div>
 
-          <h5 class="mt-3">📜 Prediction History (Global)</h5>
+          <h5 class="mt-3">📜 Recent Prediction History (Global)</h5>
           <ul class="list-group" id="historyList"></ul>
+          <button class="btn btn-link mt-2" id="viewFullGlobal">View Full History</button>
         </div>
       </div>
     </div>
 
-    <!-- ZONE MODE: for each zone create a row with left sliders and right chart+history -->
+    <!-- ZONE MODE -->
     <div id="zoneUI" style="display:none;">
       <h4>🗺️ Zones</h4>
       <div id="zonesContainer"></div>
     </div>
   </div>
 
+<!-- Full History Modal -->
+<div class="modal fade" id="fullHistoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Full Prediction History</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <h6>Global History</h6>
+        <ul id="fullGlobal" class="list-group mb-3"></ul>
+        <h6>Per-zone History</h6>
+        <div id="fullZones"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // features is passed from Flask as list of objects {name,type,min_r,max_r,mean_r}
   const features = {{ features|tojson }};
-  // mode toggle
+  let globalHistory = [];
+  let zoneHistoryStore = {};
+
   const modeGlobal = document.getElementById('modeGlobal');
   const modeZone = document.getElementById('modeZone');
   const globalUI = document.getElementById('globalUI');
   const zoneUI = document.getElementById('zoneUI');
 
-  modeGlobal.addEventListener('change', () => {
-    globalUI.style.display = 'block';
-    zoneUI.style.display = 'none';
-  });
-  modeZone.addEventListener('change', () => {
-    globalUI.style.display = 'none';
-    zoneUI.style.display = 'block';
-    if (!window.zonesLoaded) loadZones();
-  });
+  modeGlobal.addEventListener('change', () => { globalUI.style.display = 'block'; zoneUI.style.display = 'none'; });
+  modeZone.addEventListener('change', () => { globalUI.style.display = 'none'; zoneUI.style.display = 'block'; if (!window.zonesLoaded) loadZones(); });
 
-  // ---------------- GLOBAL: build sliders exactly as before ----------------
+  // ---------- GLOBAL UI ----------
   const formDiv = document.getElementById('form');
   features.forEach(f => {
     const container = document.createElement('div');
-    container.className = 'feature-card';
-
-    const label = document.createElement('label');
-    label.innerText = f.name;
-    label.style.display = 'block';
-    label.style.fontWeight = '600';
-
-    const input = document.createElement('input');
-    input.type = 'range';
-    input.className = 'form-range';
-    input.min = f.min_r;
-    input.max = f.max_r;
-    input.step = (f.max_r - f.min_r) / 100.0 || 1;
-    input.value = f.mean_r;
+    container.className = 'feature-card fade-in';
+    const label = document.createElement('label'); label.innerText = f.name; label.style.display='block'; label.style.fontWeight='600';
+    const input = document.createElement('input'); input.type='range'; input.className='form-range';
+    input.min = f.min_r; input.max = f.max_r; input.step = (f.max_r - f.min_r)/100.0 || 1; input.value = f.mean_r;
     input.id = 'inp_' + f.name.replace(/\s+/g,'_');
-
-    const valspan = document.createElement('span');
-    valspan.className = 'slider-value';
-    valspan.id = 'val_' + f.name.replace(/\s+/g,'_');
-    valspan.innerText = input.value;
-
-    // auto-predict on input (same behavior as global)
+    const valspan = document.createElement('span'); valspan.className='slider-value'; valspan.id = 'val_' + f.name.replace(/\s+/g,'_'); valspan.innerText = input.value;
     input.oninput = () => { valspan.innerText = input.value; makePredict(); };
-
-    container.appendChild(label);
-    container.appendChild(input);
-    container.appendChild(valspan);
+    container.appendChild(label); container.appendChild(input); container.appendChild(valspan);
     formDiv.appendChild(container);
   });
 
-  // Chart.js gauge for global
   let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
     type: 'doughnut',
-    data: { labels: ['Risk','Safe'], datasets: [{ data: [0,100], backgroundColor: ['#e74c3c', '#bdc3c7'], borderWidth: 0 }] },
-    options: { cutout: '70%', plugins: { legend: { display: false } } }
+    data: { labels: ['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
+    options: { cutout: '70%', plugins:{ legend:{ display:false } } }
   });
 
-  // makePredict (global) - uses same /predict endpoint and payload shape as before
   async function makePredict(){
     const payload = {};
     features.forEach(f => {
       const id = 'inp_' + f.name.replace(/\s+/g,'_');
       const el = document.getElementById(id);
-      if (!el) return;
-      payload[f.name] = parseFloat(el.value);
+      if (el) payload[f.name] = parseFloat(el.value);
     });
-
-    const res = await fetch('/predict', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
+    const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const j = await res.json();
-    // show result
     document.getElementById('output').style.display = 'block';
     document.getElementById('probVal').innerText = (j.probability*100).toFixed(2) + '%';
     document.getElementById('messageText').innerText = j.message;
-    const alertBox = document.getElementById('alertBox');
-    const led = document.getElementById('led');
-    const alertText = document.getElementById('alertText');
-    if (j.alert === 'GREEN') { alertBox.className = 'result-box green'; led.style.background = '#145a32'; alertText.innerText = ' SAFE'; }
-    else if (j.alert === 'YELLOW') { alertBox.className = 'result-box yellow'; led.style.background = '#b7950b'; alertText.innerText = ' POTENTIAL RISK'; }
-    else { alertBox.className = 'result-box red'; led.style.background = '#7b241c'; alertText.innerText = ' HIGH RISK'; }
+    const alertBox = document.getElementById('alertBox'); const led = document.getElementById('led'); const alertText = document.getElementById('alertText');
+    if (j.alert === 'GREEN') { alertBox.className='result-box green fade-in'; led.style.background='#145a32'; alertText.innerText=' SAFE'; }
+    else if (j.alert === 'YELLOW') { alertBox.className='result-box yellow fade-in'; led.style.background='#b7950b'; alertText.innerText=' POTENTIAL RISK'; }
+    else { alertBox.className='result-box red fade-in'; led.style.background='#7b241c'; alertText.innerText=' HIGH RISK'; }
+    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update();
 
-    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100];
-    gaugeChart.update();
-
-    // push history
-    const li = document.createElement('li');
-    li.className = 'list-group-item';
-    li.innerText = new Date().toLocaleTimeString() + ' → ' + j.alert + ' (' + (j.probability*100).toFixed(1) + '%)';
-    document.getElementById('historyList').prepend(li);
+    const item = { ts: new Date().toISOString(), alert: j.alert, prob: j.probability };
+    globalHistory.unshift(item);
+    const recent = globalHistory.slice(0,5);
+    const ul = document.getElementById('historyList'); ul.innerHTML = '';
+    recent.forEach(it => {
+      const li = document.createElement('li'); li.className='list-group-item'; li.innerText = new Date(it.ts).toLocaleTimeString() + ' → ' + it.alert + ' (' + (it.prob*100).toFixed(1) + '%)';
+      ul.appendChild(li);
+    });
   }
-
-  // initial global prediction
   makePredict();
+
+  document.getElementById('viewFullGlobal').addEventListener('click', () => {
+    const ul = document.getElementById('fullGlobal'); ul.innerHTML = '';
+    globalHistory.forEach(it => {
+      const li = document.createElement('li'); li.className='list-group-item'; li.innerText = new Date(it.ts).toLocaleString() + ' → ' + it.alert + ' (' + (it.prob*100).toFixed(1) + '%)';
+      ul.appendChild(li);
+    });
+    const fullZonesDiv = document.getElementById('fullZones'); fullZonesDiv.innerHTML = '';
+    for (const z in zoneHistoryStore) {
+      fullZonesDiv.innerHTML += `<h6>Zone ${z}</h6><ul class="list-group mb-3">${zoneHistoryStore[z].map(it => `<li class="list-group-item">${new Date(it.ts).toLocaleString()} → ${it.alert} (${(it.prob*100).toFixed(1)}%)</li>`).join('')}</ul>`;
+    }
+    const modal = new bootstrap.Modal(document.getElementById('fullHistoryModal'));
+    modal.show();
+  });
 
   // ---------------- ZONE MODE ----------------
   async function loadZones(){
-    // fetch zones & features from backend /zones route (we added earlier)
-    const r = await fetch('/zones');
-    const obj = await r.json();
-    // obj: { zones: [...], features: [...] }
+    const res = await fetch('/zones');
+    const obj = await res.json();
     const zones = obj.zones && obj.zones.length ? obj.zones : ['A1','A2','B1','B2','C1'];
-    const featuresForZones = obj.features && obj.features.length ? obj.features : features.map(f=>f.name);
-
-    const container = document.getElementById('zonesContainer');
-    container.innerHTML = '';
+    const featuresForZones = features.map(f => ({ name: f.name, min_r: f.min_r, max_r: f.max_r, mean_r: f.mean_r }));
+    const container = document.getElementById('zonesContainer'); container.innerHTML = '';
     window.zonesLoaded = true;
-
     zones.forEach(zone => {
-      // wrapper row for each zone: left sliders, right chart+history
-      const row = document.createElement('div');
-      row.className = 'row zone-panel';
-
-      // left sliders col
+      const row = document.createElement('div'); row.className = 'row zone-panel fade-in';
       const left = document.createElement('div'); left.className = 'col-md-6';
-      const leftTitle = document.createElement('h5'); leftTitle.className='zone-title'; leftTitle.innerText = `Zone ${zone} — Sensors`;
-      left.appendChild(leftTitle);
-
-      // build sliders same as global, with IDs zone_<zone>__<feature>
-      featuresForZones.forEach(fname => {
+      const lt = document.createElement('h5'); lt.innerText = `Zone ${zone} — Sensors`; left.appendChild(lt);
+      featuresForZones.forEach(f => {
         const card = document.createElement('div'); card.className='feature-card';
-        const label = document.createElement('label'); label.innerText = fname; label.style.display='block'; label.style.fontWeight='600';
+        const label = document.createElement('label'); label.innerText = f.name; label.style.display='block'; label.style.fontWeight='600';
         const input = document.createElement('input'); input.type='range'; input.className='form-range';
-        input.min = 0; input.max = 100; input.step = 1; input.value = 50;
-        // sanitize id
-        const safeF = fname.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+        input.min = f.min_r; input.max = f.max_r; input.step = (f.max_r - f.min_r)/100.0 || 1; input.value = f.mean_r;
+        const safeF = f.name.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
         input.id = `zone_${zone}__${safeF}`;
         const valspan = document.createElement('span'); valspan.className='slider-value'; valspan.id = `val_zone_${zone}__${safeF}`; valspan.innerText = input.value;
-        // auto predict on input
         input.oninput = () => { valspan.innerText = input.value; makeZonePredict(zone); };
         card.appendChild(label); card.appendChild(input); card.appendChild(valspan);
         left.appendChild(card);
       });
 
-      // right chart+history col
-      const right = document.createElement('div'); right.className='col-md-6';
-      const rightTitle = document.createElement('h5'); rightTitle.innerText = `Zone ${zone} — Status`;
-      const resultBox = document.createElement('div'); resultBox.id = `zone_result_${zone}`; resultBox.className = 'result-box';
-      // led + text
+      const right = document.createElement('div'); right.className = 'col-md-6';
+      const rt = document.createElement('h5'); rt.innerText = `Zone ${zone} — Status`; right.appendChild(rt);
+      const resultBox = document.createElement('div'); resultBox.id = `zone_result_${zone}`; resultBox.className = 'result-box green';
       const ledWrap = document.createElement('div');
       const led = document.createElement('span'); led.className='led'; led.id = `zone_led_${zone}`; led.style.background='#145a32';
-      const txt = document.createElement('span'); txt.id = `zone_text_${zone}`; txt.innerText = ' SAFE';
+      const txt = document.createElement('span'); txt.id = `zone_text_${zone}`; txt.innerText=' SAFE';
       ledWrap.appendChild(led); ledWrap.appendChild(txt);
       const msg = document.createElement('h6'); msg.id = `zone_msg_${zone}`; msg.className='mt-2';
-      const canvas = document.createElement('canvas'); canvas.id = `gauge_${zone}`; canvas.width = 220; canvas.height = 220;
+      const canvas = document.createElement('canvas'); canvas.id = `gauge_${zone}`; canvas.width=220; canvas.height=220;
       const probP = document.createElement('p'); probP.innerHTML = 'Risk Probability: <span id="zone_prob_'+zone+'">--</span>';
       resultBox.appendChild(ledWrap); resultBox.appendChild(msg); resultBox.appendChild(canvas); resultBox.appendChild(probP);
+      right.appendChild(resultBox);
 
-      const hTitle = document.createElement('h6'); hTitle.innerText='Zone History';
-      const hList = document.createElement('ul'); hList.className='list-group'; hList.id = `zone_history_${zone}`;
+      const titleH = document.createElement('h6'); titleH.innerText='Recent History';
+      const hlist = document.createElement('ul'); hlist.className='list-group'; hlist.id = `zone_history_recent_${zone}`;
+      const viewFullBtn = document.createElement('button'); viewFullBtn.className='btn btn-link mt-2'; viewFullBtn.innerText='View Full History';
+      viewFullBtn.onclick = () => {
+        document.getElementById('fullGlobal').innerHTML = globalHistory.map(it => `<li class="list-group-item">${new Date(it.ts).toLocaleString()} → ${it.alert} (${(it.prob*100).toFixed(1)}%)</li>`).join('');
+        const fullZonesDiv = document.getElementById('fullZones'); fullZonesDiv.innerHTML = '';
+        for (const z in zoneHistoryStore) {
+          fullZonesDiv.innerHTML += `<h6>Zone ${z}</h6><ul class="list-group mb-3">${zoneHistoryStore[z].map(it => `<li class="list-group-item">${new Date(it.ts).toLocaleString()} → ${it.alert} (${(it.prob*100).toFixed(1)}%)</li>`).join('')}</ul>`;
+        }
+        const modal = new bootstrap.Modal(document.getElementById('fullHistoryModal'));
+        modal.show();
+      };
 
-      right.appendChild(rightTitle); right.appendChild(resultBox); right.appendChild(hTitle); right.appendChild(hList);
+      right.appendChild(titleH); right.appendChild(hlist); right.appendChild(viewFullBtn);
 
       row.appendChild(left); row.appendChild(right);
       container.appendChild(row);
 
-      // create Chart.js doughnut for zone
       createZoneChart(zone);
-      // initial prediction for zone (so UI shows initial state)
+      zoneHistoryStore[zone] = [];
       makeZonePredict(zone);
     });
   }
 
-  // store charts
   const zoneCharts = {};
   function createZoneChart(zone){
     const ctx = document.getElementById(`gauge_${zone}`);
-    // create chart (doughnut)
     const c = new Chart(ctx, {
       type: 'doughnut',
       data: { labels:['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
@@ -253,65 +242,44 @@
     zoneCharts[zone] = c;
   }
 
-  // build payload for a single zone and call /predict in zone-mode shape
   async function makeZonePredict(zoneName){
-    // construct zone-specific readings
-    const zonePayload = {};
     const readings = {};
-    // use feature names from global 'features' object (same as global UI)
     features.forEach(f => {
       const safeF = f.name.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
       const el = document.getElementById(`zone_${zoneName}__${safeF}`);
       if (el) readings[f.name] = parseFloat(el.value);
     });
-    // zone-mode expects: { "A1": { feature:value, ... }, "A2": {...} }
-    const payload = {};
-    payload[zoneName] = readings;
-
-    const res = await fetch('/predict', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    });
+    const payload = {}; payload[zoneName] = readings;
+    const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const j = await res.json();
-    // j: { zones: { zoneName: {...}}, summary: {...} } OR single-zone response if backend returns differently
-    let zoneRes = null;
-    if (j.zones && j.zones[zoneName]) zoneRes = j.zones[zoneName];
-    else if (j.zone && j.zone === zoneName) zoneRes = j; // fallback
-    else if (j.probability !== undefined) zoneRes = j; // if backend returned single-row style
-
-    if (!zoneRes) {
-      // fallback: compute simple demo-probability client-side if backend didn't return zone structure
+    const zoneRes = (j.zones && j.zones[zoneName]) ? j.zones[zoneName] : (j.probability !== undefined ? j : null);
+    let final = zoneRes;
+    if (!final) {
       const demo = demoScore(readings);
-      zoneRes = { probability: demo, alert: (demo<0.3?'GREEN':(demo<0.7?'YELLOW':'RED')), message: 'Demo fallback' };
+      final = { probability: demo, alert: (demo<0.3?'GREEN':(demo<0.7?'YELLOW':'RED')), message:'Demo fallback' };
     }
-
-    // update UI for the zone
-    const prob = zoneRes.probability;
+    const prob = final.probability;
     document.getElementById(`zone_prob_${zoneName}`).innerText = (prob*100).toFixed(1) + '%';
-    document.getElementById(`zone_msg_${zoneName}`).innerText = zoneRes.message || '';
-    const led = document.getElementById(`zone_led_${zoneName}`);
-    const txt = document.getElementById(`zone_text_${zoneName}`);
+    document.getElementById(`zone_msg_${zoneName}`).innerText = final.message || '';
+    const led = document.getElementById(`zone_led_${zoneName}`); const txt = document.getElementById(`zone_text_${zoneName}`);
     const resBox = document.getElementById(`zone_result_${zoneName}`);
-    if (zoneRes.alert === 'GREEN') { resBox.className = 'result-box green'; led.style.background='#145a32'; txt.innerText = ' SAFE'; }
-    else if (zoneRes.alert === 'YELLOW') { resBox.className = 'result-box yellow'; led.style.background='#b7950b'; txt.innerText = ' POTENTIAL RISK'; }
-    else { resBox.className = 'result-box red'; led.style.background='#7b241c'; txt.innerText = ' HIGH RISK'; }
+    if (final.alert === 'GREEN') { resBox.className='result-box green fade-in'; led.style.background='#145a32'; txt.innerText=' SAFE'; }
+    else if (final.alert === 'YELLOW') { resBox.className='result-box yellow fade-in'; led.style.background='#b7950b'; txt.innerText=' POTENTIAL RISK'; }
+    else { resBox.className='result-box red fade-in'; led.style.background='#7b241c'; txt.innerText=' HIGH RISK'; }
 
-    // update chart
     const chart = zoneCharts[zoneName];
-    if (chart) {
-      chart.data.datasets[0].data = [prob*100, 100 - prob*100];
-      chart.update();
-    }
+    if (chart) { chart.data.datasets[0].data = [prob*100, 100 - prob*100]; chart.update(); }
 
-    // add to zone history
-    const li = document.createElement('li');
-    li.className = 'list-group-item';
-    li.innerText = `${new Date().toLocaleTimeString()} → ${zoneName}: ${zoneRes.alert} (${(prob*100).toFixed(1)}%)`;
-    document.getElementById(`zone_history_${zoneName}`).prepend(li);
+    const item = { ts: new Date().toISOString(), alert: final.alert, prob: final.probability };
+    zoneHistoryStore[zoneName].unshift(item);
+    const recent = zoneHistoryStore[zoneName].slice(0,5);
+    const ul = document.getElementById(`zone_history_recent_${zoneName}`); ul.innerHTML = '';
+    recent.forEach(it => {
+      const li = document.createElement('li'); li.className='list-group-item'; li.innerText = new Date(it.ts).toLocaleTimeString() + ' → ' + it.alert + ' (' + (it.prob*100).toFixed(1) + '%)';
+      ul.appendChild(li);
+    });
   }
 
-  // a small client-side demo score fallback (same idea as demo-prob in backend)
   function demoScore(readings){
     let score = 0;
     const weights = { "Rainfall_mm":0.15, "Slope_Angle":0.10, "Soil_Saturation":0.20, "Vegetation_Cover":-0.10, "Earthquake_Activity":0.30, "Proximity_to_Water":0.15 };
