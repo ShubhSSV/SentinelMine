@@ -29,12 +29,13 @@
     .zone.highlight-yellow { fill: rgba(241,196,15,0.55); filter: drop-shadow(0 6px 14px rgba(241,196,15,0.18)); transform: scale(1.03); }
     .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
 
-    @keyframes pulse-strong {
-      0% { transform: scale(0.7); opacity: 0.9; }
-      70% { transform: scale(1.6); opacity: 0; }
+    /* PULSE: shrink inward animation (outer -> inner). We animate scale from 1.6 -> 0.7 */
+    @keyframes pulse-inward {
+      0% { transform: scale(1.6); opacity: 0.9; }
+      70% { transform: scale(0.8); opacity: 0.15; }
       100% { transform: scale(0.7); opacity: 0; }
     }
-    .pulse-circle { fill: rgba(231,76,60,0.18); animation: pulse-strong 1.8s infinite; transform-origin: center; }
+    .pulse-circle { fill: rgba(231,76,60,0.18); transform-origin: center; animation: pulse-inward 1.6s infinite; }
 
     .all-clear-badge { display:inline-block; padding:6px 10px; border-radius:8px; background:rgba(39,174,96,0.12); color:#27ae60; font-weight:600; margin-top:6px; }
     .minimap-wrap { margin-top:12px; }
@@ -93,35 +94,41 @@
           <ellipse cx="360" cy="210" rx="100" ry="28" fill="none" stroke="#cfcfcf" stroke-width="12"/>
           <ellipse cx="360" cy="210" rx="70" ry="20" fill="#9ea7aa"/>
 
-          <!-- Zones -->
+          <!-- Zones - repositioned coordinates for better alignment with terraces -->
           <g id="zonesGroup" aria-hidden="false">
-            <ellipse id="Z1" class="zone" cx="250" cy="210" rx="60" ry="20"/>
-            <text x="250" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
+            <!-- moved Z1 slightly outward-left -->
+            <ellipse id="Z1" class="zone" cx="210" cy="220" rx="70" ry="24"/>
+            <text x="210" y="220" class="zone-label" text-anchor="middle" dy="4">Z1</text>
 
-            <ellipse id="Z2" class="zone" cx="360" cy="170" rx="70" ry="22"/>
-            <text x="360" y="170" class="zone-label" text-anchor="middle" dy="4">Z2</text>
+            <!-- Z2 shifted slightly up -->
+            <ellipse id="Z2" class="zone" cx="360" cy="150" rx="80" ry="26"/>
+            <text x="360" y="150" class="zone-label" text-anchor="middle" dy="4">Z2</text>
 
-            <ellipse id="Z3" class="zone" cx="480" cy="200" rx="60" ry="18"/>
-            <text x="480" y="200" class="zone-label" text-anchor="middle" dy="4">Z3</text>
+            <!-- Z3 moved outward-right -->
+            <ellipse id="Z3" class="zone" cx="490" cy="210" rx="72" ry="22"/>
+            <text x="490" y="210" class="zone-label" text-anchor="middle" dy="4">Z3</text>
 
-            <ellipse id="Z4" class="zone" cx="300" cy="260" rx="90" ry="26"/>
-            <text x="300" y="260" class="zone-label" text-anchor="middle" dy="4">Z4</text>
+            <!-- Z4 slightly lower-left -->
+            <ellipse id="Z4" class="zone" cx="290" cy="270" rx="110" ry="34"/>
+            <text x="290" y="270" class="zone-label" text-anchor="middle" dy="4">Z4</text>
 
-            <ellipse id="Z5" class="zone" cx="420" cy="250" rx="80" ry="24"/>
-            <text x="420" y="250" class="zone-label" text-anchor="middle" dy="4">Z5</text>
+            <!-- Z5 slightly lower-right -->
+            <ellipse id="Z5" class="zone" cx="430" cy="260" rx="96" ry="30"/>
+            <text x="430" y="260" class="zone-label" text-anchor="middle" dy="4">Z5</text>
 
-            <ellipse id="Z6" class="zone" cx="360" cy="120" rx="50" ry="16"/>
-            <text x="360" y="120" class="zone-label" text-anchor="middle" dy="4">Z6</text>
+            <!-- Z6 near the inner/top center -->
+            <ellipse id="Z6" class="zone" cx="360" cy="110" rx="56" ry="18"/>
+            <text x="360" y="110" class="zone-label" text-anchor="middle" dy="4">Z6</text>
           </g>
 
-          <!-- Pulse circles (hidden by default) -->
+          <!-- Pulse circles (hidden by default) - matched to new zone positions -->
           <g id="pulseGroup" pointer-events="none">
-            <circle id="pulse-Z1" cx="250" cy="210" r="50" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z2" cx="360" cy="170" r="62" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z3" cx="480" cy="200" r="44" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z4" cx="300" cy="260" r="74" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z5" cx="420" cy="250" r="66" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z6" cx="360" cy="120" r="38" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z1" cx="210" cy="220" r="70" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z2" cx="360" cy="150" r="86" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z3" cx="490" cy="210" r="76" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z4" cx="290" cy="270" r="110" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z5" cx="430" cy="260" r="100" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z6" cx="360" cy="110" r="56" class="pulse-circle" style="display:none;"/>
           </g>
         </svg>
       </div>
@@ -154,7 +161,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ========= Full frontend JS (corrected) ========= */
+/* ========= Frontend JS (unchanged logic) ========= */
 
 const features = {{ features|tojson }};
 const formDiv = document.getElementById('form');
@@ -215,7 +222,7 @@ function renderFullHistory(){
   });
 }
 
-// Clear history button
+// Clear history
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clearHistoryBtn').addEventListener('click', () => {
     if (!confirm('Clear the full history? This cannot be undone in this session.')) return;
@@ -223,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Prediction function
+// Prediction
 async function makePredict(){
   const payload = {};
   features.forEach(f => {
@@ -236,7 +243,6 @@ async function makePredict(){
     const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const j = await res.json();
 
-    // show output
     document.getElementById('output').style.display = 'block';
     document.getElementById('probVal').innerText = (j.probability*100).toFixed(2) + '%';
     document.getElementById('messageText').innerText = j.message;
@@ -247,8 +253,7 @@ async function makePredict(){
     else { alertBox.className='result-box red'; led.style.background='#7b241c'; alertText.innerText=' HIGH RISK'; }
 
     // update gauge
-    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100];
-    gaugeChart.update();
+    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update();
 
     // add to history
     const entry = { ts: new Date().toLocaleString(), alert: j.alert, prob: j.probability, message: j.message, debug: j.debug||{} };
@@ -260,14 +265,13 @@ async function makePredict(){
 
   } catch(err) {
     console.error('Prediction error', err);
-    // show a simple message in console; do not stop UI
   }
 }
 
-// initial prediction on load
+// initial predict
 document.addEventListener('DOMContentLoaded', () => { makePredict(); });
 
-// ======= SVG highlight logic (fixed syntax) =======
+// SVG highlight logic
 const zoneIds = ['Z1','Z2','Z3','Z4','Z5','Z6'];
 
 function resetMineHighlights(){
@@ -320,9 +324,8 @@ function updateMineHighlights(prob){
       chosen.push(zoneIds[idx]);
     }
   }
-  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]); // fallback
+  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]);
 
-  // apply highlights
   for (let i = 0; i < chosen.length; i++){
     const id = chosen[i];
     const el = document.getElementById(id);
