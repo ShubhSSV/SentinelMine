@@ -30,11 +30,11 @@
     .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
 
     @keyframes pulse-strong {
-      0% { r: 0; opacity: 0.9; }
-      70% { r: 70; opacity: 0; }
-      100% { r: 0; opacity: 0; }
+      0% { transform: scale(0.7); opacity: 0.9; }
+      70% { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(0.7); opacity: 0; }
     }
-    .pulse-circle { fill: rgba(231,76,60,0.25); animation: pulse-strong 2s infinite; }
+    .pulse-circle { fill: rgba(231,76,60,0.18); animation: pulse-strong 1.8s infinite; transform-origin: center; }
 
     .all-clear-badge { display:inline-block; padding:6px 10px; border-radius:8px; background:rgba(39,174,96,0.12); color:#27ae60; font-weight:600; margin-top:6px; }
     .minimap-wrap { margin-top:12px; }
@@ -154,74 +154,68 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* Full JS: creates sliders, handles predictions, updates gauge, history and SVG highlights.
-   This is the same logic we used earlier — restored fully so UI works again. */
+/* ========= Full frontend JS (corrected) ========= */
 
 const features = {{ features|tojson }};
 const formDiv = document.getElementById('form');
 const fullHistory = [];
 
-// Build UI controls
+// Build controls
 features.forEach(f => {
   const col = document.createElement('div'); col.className='col-md-6';
   const card = document.createElement('div'); card.className='feature-card';
-
-  const label = document.createElement('label'); label.innerText = f.name; label.className='form-label';
+  const label = document.createElement('label'); label.innerText=f.name; label.className='form-label';
   card.appendChild(label);
 
   if (f.type === 'numeric') {
     const input = document.createElement('input'); input.type='range'; input.className='form-range';
     input.min = f.min_r; input.max = f.max_r; input.step = Math.max((f.max_r - f.min_r)/100.0, 0.0001);
     input.value = f.mean_r; input.id = 'inp_' + f.name;
-
     const valspan = document.createElement('span'); valspan.id = 'val_' + f.name; valspan.innerText = Number(input.value).toFixed(3);
-
     input.oninput = () => { valspan.innerText = Number(input.value).toFixed(3); makePredict(); };
-
     card.appendChild(input); card.appendChild(document.createElement('br')); card.appendChild(valspan);
   } else {
-    const sel = document.createElement('select'); sel.className='form-select'; sel.id='inp_'+f.name;
-    (f.options||[]).forEach(opt => { const o=document.createElement('option'); o.value=opt; o.text=opt; sel.appendChild(o); });
+    const sel = document.createElement('select'); sel.className='form-select'; sel.id = 'inp_' + f.name;
+    (f.options||[]).forEach(opt=>{ const o = document.createElement('option'); o.value=opt; o.text=opt; sel.appendChild(o); });
     sel.onchange = makePredict; card.appendChild(sel);
   }
-
   col.appendChild(card); formDiv.appendChild(col);
 });
 
 // Chart gauge
 let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
-  type: 'doughnut',
-  data: { labels:['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
-  options: { cutout:'70%', plugins:{ legend:{ display:false } } }
+  type:'doughnut',
+  data:{ labels:['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
+  options:{ cutout:'70%', plugins:{ legend:{ display:false } } }
 });
 
 // History helpers
-function renderRecent() {
-  const list = document.getElementById('historyList'); list.innerHTML='';
+function renderRecent(){
+  const list = document.getElementById('historyList'); list.innerHTML = '';
   const recent = fullHistory.slice(0,5);
   if (recent.length === 0) {
     const li = document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history yet — move sliders to generate predictions'; list.appendChild(li); return;
   }
-  recent.forEach(it => {
+  recent.forEach(it=>{
     const li = document.createElement('li'); li.className='list-group-item';
     li.innerHTML = `<strong>${it.ts}</strong> → ${it.alert} <span class="small-muted">(${(it.prob*100).toFixed(1)}%)</span><div class="small-muted">${it.message}</div>`;
     list.appendChild(li);
   });
 }
-function renderFullHistory() {
-  const full = document.getElementById('fullHistoryList'); full.innerHTML='';
+function renderFullHistory(){
+  const full = document.getElementById('fullHistoryList'); full.innerHTML = '';
   if (fullHistory.length === 0) {
-    const li=document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history available'; full.appendChild(li); return;
+    const li = document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history available'; full.appendChild(li); return;
   }
-  fullHistory.forEach(it => {
-    const li=document.createElement('li'); li.className='list-group-item';
+  fullHistory.forEach(it=>{
+    const li = document.createElement('li'); li.className='list-group-item';
     const dbg = JSON.stringify(it.debug||{}, null, 2);
     li.innerHTML = `<div class="d-flex justify-content-between"><div><strong>${it.ts}</strong> → ${it.alert} <small class="small-muted">(${(it.prob*100).toFixed(1)}%)</small></div><div><small class="small-muted">${it.message}</small></div></div><pre class="debug-box mt-2">${dbg}</pre>`;
     full.appendChild(li);
   });
 }
 
-// clear history
+// Clear history button
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clearHistoryBtn').addEventListener('click', () => {
     if (!confirm('Clear the full history? This cannot be undone in this session.')) return;
@@ -229,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// prediction
+// Prediction function
 async function makePredict(){
   const payload = {};
   features.forEach(f => {
@@ -242,6 +236,7 @@ async function makePredict(){
     const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const j = await res.json();
 
+    // show output
     document.getElementById('output').style.display = 'block';
     document.getElementById('probVal').innerText = (j.probability*100).toFixed(2) + '%';
     document.getElementById('messageText').innerText = j.message;
@@ -251,12 +246,13 @@ async function makePredict(){
     else if (j.alert === 'YELLOW') { alertBox.className='result-box yellow'; led.style.background='#b7950b'; alertText.innerText=' POTENTIAL RISK'; }
     else { alertBox.className='result-box red'; led.style.background='#7b241c'; alertText.innerText=' HIGH RISK'; }
 
-    // gauge
-    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update();
+    // update gauge
+    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100];
+    gaugeChart.update();
 
-    // history
+    // add to history
     const entry = { ts: new Date().toLocaleString(), alert: j.alert, prob: j.probability, message: j.message, debug: j.debug||{} };
-    fullHistory.unshift(entry); if (fullHistory.length>500) fullHistory.pop();
+    fullHistory.unshift(entry); if (fullHistory.length > 500) fullHistory.pop();
     renderRecent(); renderFullHistory();
 
     // update SVG highlights
@@ -264,13 +260,14 @@ async function makePredict(){
 
   } catch(err) {
     console.error('Prediction error', err);
+    // show a simple message in console; do not stop UI
   }
 }
 
-// initial predict on load
+// initial prediction on load
 document.addEventListener('DOMContentLoaded', () => { makePredict(); });
 
-// SVG highlight logic (toggle classes only)
+// ======= SVG highlight logic (fixed syntax) =======
 const zoneIds = ['Z1','Z2','Z3','Z4','Z5','Z6'];
 
 function resetMineHighlights(){
@@ -279,10 +276,12 @@ function resetMineHighlights(){
     if (!el) return;
     el.classList.remove('highlight-red','highlight-yellow');
     const pulse = document.getElementById('pulse-'+id);
-    if (pulse) pulse.style.display='none';
+    if (pulse) pulse.style.display = 'none';
   });
-  document.getElementById('allClearBadge').style.display='none';
-  document.getElementById('mineStatus').innerText = 'Simulation status will update after each slider change.';
+  const badge = document.getElementById('allClearBadge');
+  if (badge) badge.style.display = 'none';
+  const status = document.getElementById('mineStatus');
+  if (status) status.innerText = 'Simulation status will update after each slider change.';
 }
 
 function updateMineHighlights(prob){
@@ -301,44 +300,57 @@ function updateMineHighlights(prob){
   }
 
   if (count === 0) {
-    document.getElementById('allClearBadge').style.display='inline-block';
-    document.getElementById('mineStatus').innerText = 'Most likely no rockfall — all clear.';
+    const badge = document.getElementById('allClearBadge'); if (badge) badge.style.display = 'inline-block';
+    const status = document.getElementById('mineStatus'); if (status) status.innerText = 'Most likely no rockfall — all clear.';
     return;
   }
 
+  // shuffle indices
   const indices = [...Array(zoneIds.length).keys()];
-  for (let i = indices.length -1; i>0; i--) {
-    const j = Math.floor(Math.random()*(i+1));
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
 
   const chosen = [];
-  for (let k=0; k<indices.length && chosen.length < count; k++){
+  for (let k = 0; k < indices.length && chosen.length < count; k++){
     const idx = indices[k];
-    const zoneFactor = 0.6 + 0.8*Math.random();
-    if (Math.random() < Math.min(1, p * zoneFactor + 0.05)) chosen.push(zoneIds[idx];
+    const zoneFactor = 0.6 + 0.8 * Math.random();
+    if (Math.random() < Math.min(1, p * zoneFactor + 0.05)) {
+      chosen.push(zoneIds[idx]);
+    }
   }
-  // fallback ensure
-  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]);
+  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]); // fallback
 
-  for (let i=0;i<chosen.length;i++){
-    const id = chosen[i]; const el = document.getElementById(id);
+  // apply highlights
+  for (let i = 0; i < chosen.length; i++){
+    const id = chosen[i];
+    const el = document.getElementById(id);
     if (!el) continue;
-    if (p >= 0.75 && i===0) {
+    if (p >= 0.75 && i === 0) {
       el.classList.add('highlight-red');
-      const pulse = document.getElementById('pulse-'+id); if (pulse) pulse.style.display='block';
+      const pulse = document.getElementById('pulse-' + id);
+      if (pulse) pulse.style.display = 'block';
     } else {
       el.classList.add('highlight-yellow');
-      const pulse = document.getElementById('pulse-'+id); if (pulse) pulse.style.display='block';
+      const pulse = document.getElementById('pulse-' + id);
+      if (pulse) pulse.style.display = 'block';
     }
   }
 
-  document.getElementById('mineStatus').innerText = `Highlighted ${chosen.length} zone(s) — risk ${(p*100).toFixed(1)}%`;
+  const status = document.getElementById('mineStatus');
+  if (status) status.innerText = `Highlighted ${chosen.length} zone(s) — risk ${(p*100).toFixed(1)}%`;
 }
 
-// ensure full history modal refreshes
-const fullHistoryModal = document.getElementById('fullHistoryModal');
-if (fullHistoryModal) fullHistoryModal.addEventListener('show.bs.modal', renderFullHistory);
+// refresh full-history modal on open
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('fullHistoryModal');
+  if (modal) {
+    modal.addEventListener('show.bs.modal', () => {
+      renderFullHistory();
+    });
+  }
+});
 </script>
 </body>
 </html>
