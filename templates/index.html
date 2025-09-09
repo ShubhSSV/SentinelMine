@@ -20,13 +20,32 @@
     .led { display:inline-block; width:18px; height:18px; border-radius:50%; margin-right:8px; vertical-align:middle; }
     #history { margin-top:30px; }
     .small-muted { font-size:0.85rem; color:#6c757d; }
-    #mineCanvas { width: 100%; max-width: 720px; height: auto; border-radius:8px; background: linear-gradient(#fcfcfc,#f7f7f7); display:block; margin: 8px 0 16px; }
-    .mine-caption { font-size:0.9rem; color:#555; }
-    pre.debug-box { background:#f8f9fa; padding:8px; border-radius:6px; white-space:pre-wrap; }
+    .mine-caption { font-size:0.9rem; color:#555; margin-top:8px; }
+
+    /* SVG zone base styles */
+    .mine-svg { width:100%; max-width:720px; height:auto; display:block; margin-top:12px; }
+    .zone { fill: rgba(255,255,255,0.03); stroke: rgba(0,0,0,0.08); stroke-width:1; transition: fill 300ms ease, filter 300ms ease, transform 300ms ease; }
+    .zone-label { font-size:12px; fill:#222; pointer-events:none; }
+
+    /* highlight states */
+    .zone.highlight-yellow { fill: rgba(241,196,15,0.55); filter: drop-shadow(0 6px 14px rgba(241,196,15,0.18)); transform: scale(1.03); }
+    .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
+
+    /* pulsing animation for critical highlights */
+    @keyframes pulse-strong {
+      0% { box-shadow: 0 0 0 0 rgba(231,76,60,0.25); }
+      70% { box-shadow: 0 0 0 18px rgba(231,76,60,0); }
+      100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); }
+    }
+    /* apply to an overlay circle for pulse - we add a separate <circle> as pulse indicator if needed */
+    .pulse-circle { animation: pulse-strong 1600ms infinite; opacity:0.95; }
+
+    /* small helper for All Clear badge */
+    .all-clear-badge { display:inline-block; padding:6px 10px; border-radius:8px; background:rgba(39,174,96,0.12); color:#27ae60; font-weight:600; margin-top:6px; }
+    .minimap-wrap { margin-top:12px; }
   </style>
 </head>
 <body>
-  <!-- Navbar -->
   <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
       <a class="navbar-brand">⛏️ SentinelMine Risk Monitor</a>
@@ -35,13 +54,13 @@
 
   <div class="container mt-4">
     <div class="row">
-      <!-- Input section (left) -->
+      <!-- Input (left) -->
       <div class="col-md-6">
         <h4 class="mb-3">⚙️ Sensor Controls</h4>
         <div class="row" id="form"></div>
       </div>
 
-      <!-- Output section (right) -->
+      <!-- Output (right) -->
       <div class="col-md-6">
         <h4 class="mb-3">📊 Prediction Result</h4>
         <div id="output" style="display:none;">
@@ -67,11 +86,60 @@
       </div>
     </div>
 
-    <!-- Mine simulation section -->
-    <div id="mineSim" class="mt-5">
-      <h4>⛏️ Mine Risk Simulation</h4>
-      <canvas id="mineCanvas" width="720" height="380"></canvas>
-      <p class="mine-caption">This simulation highlights areas of the open-pit mine that may be at risk of rockfall/landslide based on the current prediction. Higher risk increases chance of highlighted zone(s).</p>
+    <!-- Mine (SVG top-view) -->
+    <div class="mt-5">
+      <h4>⛏️ Mine Risk Map (top view)</h4>
+      <div class="minimap-wrap">
+        <!-- Static SVG: terraces + 6 zones that we will highlight by toggling classes -->
+        <svg id="mineSvg" class="mine-svg" viewBox="0 0 720 380" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Top view open pit mine">
+          <!-- Background terraces (simple shapes for visual) -->
+          <ellipse cx="360" cy="290" rx="300" ry="70" fill="#dfe6e9"/>
+          <ellipse cx="360" cy="260" rx="260" ry="58" fill="#e9ecef"/>
+          <ellipse cx="360" cy="230" rx="215" ry="48" fill="#d6d6d6"/>
+          <ellipse cx="360" cy="200" rx="165" ry="40" fill="#cfcfcf"/>
+          <ellipse cx="360" cy="170" rx="120" ry="30" fill="#c2c2c2"/>
+
+          <!-- inner pit -->
+          <ellipse cx="360" cy="320" rx="250" ry="56" fill="#f6f7f8" opacity="0.9"/>
+
+          <!-- Zones (top-view ovals). IDs used by JS -->
+          <g id="zonesGroup">
+            <ellipse id="Z1" class="zone" cx="250" cy="210" rx="90" ry="28"/>
+            <text x="250" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
+
+            <ellipse id="Z2" class="zone" cx="360" cy="170" rx="110" ry="30"/>
+            <text x="360" y="170" class="zone-label" text-anchor="middle" dy="4">Z2</text>
+
+            <ellipse id="Z3" class="zone" cx="480" cy="200" rx="82" ry="26"/>
+            <text x="480" y="200" class="zone-label" text-anchor="middle" dy="4">Z3</text>
+
+            <ellipse id="Z4" class="zone" cx="300" cy="260" rx="140" ry="36"/>
+            <text x="300" y="260" class="zone-label" text-anchor="middle" dy="4">Z4</text>
+
+            <ellipse id="Z5" class="zone" cx="420" cy="250" rx="120" ry="32"/>
+            <text x="420" y="250" class="zone-label" text-anchor="middle" dy="4">Z5</text>
+
+            <ellipse id="Z6" class="zone" cx="360" cy="100" rx="70" ry="22"/>
+            <text x="360" y="100" class="zone-label" text-anchor="middle" dy="4">Z6</text>
+          </g>
+
+          <!-- Pulse circles (hidden by default). Each maps to a zone ID like pulse-Z1 -->
+          <g id="pulseGroup" pointer-events="none">
+            <circle id="pulse-Z1" cx="250" cy="210" r="50" class="pulse-circle" style="display:none; fill:rgba(231,76,60,0.12)"/>
+            <circle id="pulse-Z2" cx="360" cy="170" r="62" class="pulse-circle" style="display:none; fill:rgba(241,196,15,0.12)"/>
+            <circle id="pulse-Z3" cx="480" cy="200" r="44" class="pulse-circle" style="display:none; fill:rgba(231,76,60,0.12)"/>
+            <circle id="pulse-Z4" cx="300" cy="260" r="74" class="pulse-circle" style="display:none; fill:rgba(241,196,15,0.12)"/>
+            <circle id="pulse-Z5" cx="420" cy="250" r="66" class="pulse-circle" style="display:none; fill:rgba(231,76,60,0.12)"/>
+            <circle id="pulse-Z6" cx="360" cy="100" r="38" class="pulse-circle" style="display:none; fill:rgba(241,196,15,0.12)"/>
+          </g>
+        </svg>
+      </div>
+
+      <div style="margin-top:6px;">
+        <span id="allClearBadge" class="all-clear-badge" style="display:none;">All Clear</span>
+        <span id="mineStatus" class="small-muted" style="margin-left:8px;">Simulation status will update after each slider change.</span>
+      </div>
+      <p class="mine-caption">Top view schematic: highlighted zones indicate likely area(s) of rockfall/landslide. Higher risk increases chance and intensity of highlights.</p>
     </div>
   </div>
 
@@ -94,64 +162,16 @@
     </div>
   </div>
 
-  <!-- Bootstrap JS (bundle includes Popper) -->
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-// features passed from Flask
+/* ---------- Frontend logic: sliders, predict, history ---------- */
 const features = {{ features|tojson }};
 const formDiv = document.getElementById('form');
+const fullHistory = [];  // most recent first
 
-// In-memory history arrays (most recent first)
-const fullHistory = []; // stores objects: {ts, alert, prob, message, debug}
-
-// Helper: render recent (max 5)
-function renderRecent() {
-  const historyList = document.getElementById('historyList');
-  historyList.innerHTML = '';
-  const recent = fullHistory.slice(0, 5);
-  if (recent.length === 0) {
-    const li = document.createElement('li');
-    li.className = 'list-group-item small-muted';
-    li.innerText = 'No history yet — move sliders to generate predictions';
-    historyList.appendChild(li);
-    return;
-  }
-  recent.forEach(item => {
-    const li = document.createElement('li');
-    li.className = 'list-group-item';
-    li.innerHTML = `<strong>${item.ts}</strong> → ${item.alert} <span class="small-muted">(${(item.prob*100).toFixed(1)}%)</span><div class="small-muted">${item.message}</div>`;
-    historyList.appendChild(li);
-  });
-}
-
-// Helper: render full modal history
-function renderFullHistory() {
-  const fullList = document.getElementById('fullHistoryList');
-  fullList.innerHTML = '';
-  if (fullHistory.length === 0) {
-    const li = document.createElement('li');
-    li.className = 'list-group-item small-muted';
-    li.innerText = 'No history available';
-    fullList.appendChild(li);
-    return;
-  }
-  fullHistory.forEach(item => {
-    const li = document.createElement('li');
-    li.className = 'list-group-item';
-    const debugJson = JSON.stringify(item.debug || {}, null, 2);
-    li.innerHTML = `
-      <div class="d-flex justify-content-between">
-        <div><strong>${item.ts}</strong> → ${item.alert} <small class="small-muted">(${(item.prob*100).toFixed(1)}%)</small></div>
-        <div><small class="small-muted">${item.message}</small></div>
-      </div>
-      <pre class="debug-box mt-2">${debugJson}</pre>
-    `;
-    fullList.appendChild(li);
-  });
-}
-
-// Create cards for each feature (left-side)
+// Build UI sliders / selects
 features.forEach(f => {
   const col = document.createElement('div');
   col.className = 'col-md-6';
@@ -182,14 +202,13 @@ features.forEach(f => {
     card.appendChild(input);
     card.appendChild(document.createElement('br'));
     card.appendChild(valspan);
-  } else if (f.type === 'categorical') {
+  } else {
     const sel = document.createElement('select');
     sel.className = 'form-select';
     sel.id = 'inp_' + f.name;
     (f.options || []).forEach(opt => {
       const o = document.createElement('option');
-      o.value = opt;
-      o.text = opt;
+      o.value = opt; o.text = opt;
       sel.appendChild(o);
     });
     sel.onchange = makePredict;
@@ -200,7 +219,7 @@ features.forEach(f => {
   formDiv.appendChild(col);
 });
 
-// Chart.js gauge (donut)
+// Chart gauge
 let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
   type: 'doughnut',
   data: {
@@ -211,28 +230,58 @@ let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
       borderWidth: 0
     }]
   },
-  options: {
-    cutout: '70%',
-    plugins: { legend: { display: false } }
-  }
+  options: { cutout: '70%', plugins: { legend: { display: false } } }
 });
 
-// Prediction function
-let lastPrediction = null;
-async function makePredict() {
+// History rendering
+function renderRecent() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '';
+  const recent = fullHistory.slice(0,5);
+  if (recent.length === 0) {
+    const li = document.createElement('li'); li.className='list-group-item small-muted';
+    li.innerText = 'No history yet — move sliders to generate predictions';
+    list.appendChild(li); return;
+  }
+  recent.forEach(it => {
+    const li = document.createElement('li'); li.className='list-group-item';
+    li.innerHTML = `<strong>${it.ts}</strong> → ${it.alert} <span class="small-muted">(${(it.prob*100).toFixed(1)}%)</span><div class="small-muted">${it.message}</div>`;
+    list.appendChild(li);
+  });
+}
+function renderFullHistory() {
+  const full = document.getElementById('fullHistoryList'); full.innerHTML='';
+  if (fullHistory.length===0) {
+    const li = document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history available'; full.appendChild(li); return;
+  }
+  fullHistory.forEach(it => {
+    const li = document.createElement('li'); li.className='list-group-item';
+    const dbg = JSON.stringify(it.debug||{}, null, 2);
+    li.innerHTML = `<div class="d-flex justify-content-between"><div><strong>${it.ts}</strong> → ${it.alert} <small class="small-muted">(${(it.prob*100).toFixed(1)}%)</small></div><div><small class="small-muted">${it.message}</small></div></div><pre class="debug-box mt-2">${dbg}</pre>`;
+    full.appendChild(li);
+  });
+}
+
+// Clear history button
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+    if (!confirm('Clear the full history? This cannot be undone in this session.')) return;
+    fullHistory.length = 0; renderRecent(); renderFullHistory();
+  });
+});
+
+// Prediction call
+async function makePredict(){
   const payload = {};
   features.forEach(f => {
     const el = document.getElementById('inp_' + f.name);
     if (!el) return;
-    if (f.type === 'numeric') payload[f.name] = parseFloat(el.value);
-    else payload[f.name] = el.value;
+    payload[f.name] = (f.type === 'numeric') ? parseFloat(el.value) : el.value;
   });
 
   try {
     const res = await fetch('/predict', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload),
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
     });
     const j = await res.json();
 
@@ -240,262 +289,127 @@ async function makePredict() {
     document.getElementById('probVal').innerText = (j.probability*100).toFixed(2) + '%';
     document.getElementById('messageText').innerText = j.message;
 
-    const alertBox = document.getElementById('alertBox');
-    const led = document.getElementById('led');
-    const alertText = document.getElementById('alertText');
-    if (j.alert === 'GREEN') {
-      alertBox.className = 'result-box green';
-      led.style.background = '#145a32';
-      alertText.innerText = ' SAFE';
-    } else if (j.alert === 'YELLOW') {
-      alertBox.className = 'result-box yellow';
-      led.style.background = '#b7950b';
-      alertText.innerText = ' POTENTIAL RISK';
-    } else {
-      alertBox.className = 'result-box red';
-      led.style.background = '#7b241c';
-      alertText.innerText = ' HIGH RISK';
-    }
+    const alertBox = document.getElementById('alertBox'), led = document.getElementById('led'), alertText = document.getElementById('alertText');
+    if (j.alert === 'GREEN') { alertBox.className='result-box green'; led.style.background='#145a32'; alertText.innerText=' SAFE'; }
+    else if (j.alert === 'YELLOW') { alertBox.className='result-box yellow'; led.style.background='#b7950b'; alertText.innerText=' POTENTIAL RISK'; }
+    else { alertBox.className='result-box red'; led.style.background='#7b241c'; alertText.innerText=' HIGH RISK'; }
 
-    // Update gauge
-    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100];
-    gaugeChart.update();
+    // gauge
+    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update();
 
-    // Add to full history (prepend)
-    const entry = {
-      ts: new Date().toLocaleString(),
-      alert: j.alert,
-      prob: j.probability,
-      message: j.message,
-      debug: j.debug || {}
-    };
-    fullHistory.unshift(entry);
-    // cap history to 500 entries
-    if (fullHistory.length > 500) fullHistory.pop();
+    // history
+    const entry = { ts: new Date().toLocaleString(), alert: j.alert, prob: j.probability, message: j.message, debug: j.debug||{} };
+    fullHistory.unshift(entry); if (fullHistory.length>500) fullHistory.pop();
+    renderRecent(); renderFullHistory();
 
-    // render recent and full
-    renderRecent();
-    renderFullHistory();
+    // update mine map highlights (no redraw of SVG; just toggle classes)
+    updateMineHighlights(j.probability);
 
-    // Update mine simulation based on new probability
-    updateMineGraphic(j.probability);
-
-    lastPrediction = j;
-  } catch (err) {
+  } catch(err) {
     console.error('Prediction error', err);
   }
 }
 
-// Clear history button in modal
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('clearHistoryBtn').addEventListener('click', () => {
-    if (!confirm('Clear the full history? This cannot be undone in this session.')) return;
-    fullHistory.length = 0;
-    renderRecent();
-    renderFullHistory();
-  });
+// ensure initial predict on load
+document.addEventListener('DOMContentLoaded', () => { makePredict(); });
 
-  // initial predict after load
-  makePredict();
-});
+// -------------------- SVG zone highlighting logic --------------------
 
-// When modal opens, ensure full list is up to date
-const fullHistoryModal = document.getElementById('fullHistoryModal');
-if (fullHistoryModal) {
-  fullHistoryModal.addEventListener('show.bs.modal', renderFullHistory);
-}
-
-/* ---------------------------
-   Mine simulation graphic
-   ---------------------------
-   - Draws a stylized open-pit mine.
-   - Highlights zone(s) randomly depending on risk probability.
+/*
+  Strategy:
+  - We have zones Z1..Z6 as SVG <ellipse> elements.
+  - On each update we remove previous highlight classes and set new ones:
+      - For low risk: usually no highlight (show "All Clear")
+      - medium risk: 1 zone highlighted (yellow)
+      - high risk: 1-2 zones highlighted (red or red+yellow), and show pulse on critical zones
+  - Selection is random but weighted by risk, so higher risk makes highlights more likely.
+  - We do NOT recreate SVG elements; we only toggle CSS classes and show/hide pulse circles.
 */
-function updateMineGraphic(prob) {
-  const canvas = document.getElementById("mineCanvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const DPR = window.devicePixelRatio || 1;
-  // handle high-DPI
-  const logicalW = canvas.width;
-  const logicalH = canvas.height;
-  canvas.width = logicalW * DPR;
-  canvas.height = logicalH * DPR;
-  canvas.style.width = logicalW + "px";
-  canvas.style.height = logicalH + "px";
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  const w = logicalW, h = logicalH;
-  ctx.clearRect(0, 0, w, h);
+const zoneIds = ['Z1','Z2','Z3','Z4','Z5','Z6'];
 
-  // Background
-  ctx.fillStyle = "#fbfbfb";
-  ctx.fillRect(0, 0, w, h);
-
-  // Draw terraces (ellipses) from bottom to top to create open pit look
-  const terraces = [
-    {rx: 320, ry: 90, y: h*0.70, color:"#cfcfcf"},
-    {rx: 260, ry: 70, y: h*0.62, color:"#e6e6e6"},
-    {rx: 200, ry: 50, y: h*0.54, color:"#d6d6d6"},
-    {rx: 140, ry: 36, y: h*0.46, color:"#c2c2c2"},
-    {rx: 90,  ry: 26, y: h*0.38, color:"#b0b0b0"}
-  ];
-
-  terraces.forEach((t,i) => {
-    ctx.beginPath();
-    ctx.ellipse(w/2, t.y, t.rx, t.ry, 0, 0, Math.PI*2);
-    ctx.fillStyle = t.color;
-    ctx.fill();
-    // inner stroke to define terrace edge
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+function resetMineHighlights(){
+  zoneIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('highlight-red','highlight-yellow');
+    // hide pulse circle if exists
+    const pulse = document.getElementById('pulse-'+id);
+    if (pulse) pulse.style.display = 'none';
   });
-
-  // Draw central pit shading
-  ctx.beginPath();
-  ctx.ellipse(w/2, h*0.74, 260, 70, 0, 0, Math.PI*2);
-  ctx.fillStyle = "#e9ecef";
-  ctx.fill();
-
-  // Define some "zones" (rectangles/arcs) to highlight later.
-  // Each zone object holds a path or bounding box describing its area.
-  const zones = [
-    {id:"Z1", cx: w*0.32, cy: h*0.56, w: 110, h: 36, angle: -0.2},
-    {id:"Z2", cx: w*0.52, cy: h*0.50, w: 140, h: 44, angle: 0.1},
-    {id:"Z3", cx: w*0.68, cy: h*0.62, w: 100, h: 34, angle: 0.2},
-    {id:"Z4", cx: w*0.43, cy: h*0.70, w: 160, h: 46, angle: -0.05},
-    {id:"Z5", cx: w*0.60, cy: h*0.40, w: 90,  h: 28, angle: 0.0}
-  ];
-
-  // Draw subtle zone outlines (safe state)
-  zones.forEach(z => {
-    ctx.save();
-    ctx.translate(z.cx, z.cy);
-    ctx.rotate(z.angle);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, z.w/2, z.h/2, 0, 0, Math.PI*2);
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-  });
-
-  // Determine how many zones to highlight based on probability:
-  // low prob -> often zero; medium -> 1; high -> 1-2 (or occasionally 3).
-  const p = Math.max(0, Math.min(1, prob || 0));
-  const rnd = Math.random();
-
-  // Decide highlight count probabilistically
-  let highlightCount = 0;
-  if (p < 0.15) highlightCount = (Math.random() < p*2) ? 1 : 0;
-  else if (p < 0.4) highlightCount = (Math.random() < p) ? 1 : 0;
-  else if (p < 0.7) highlightCount = (Math.random() < p) ? 1 : 0;
-  else {
-    // high risk -> 1 or 2, sometimes 3
-    const r = Math.random();
-    if (r < 0.6) highlightCount = 1;
-    else if (r < 0.95) highlightCount = 2;
-    else highlightCount = 3;
-  }
-
-  // Probability-weighted chance to highlight each zone - pick distinct zones
-  const chosen = [];
-  const zoneIndices = [...Array(zones.length).keys()];
-  // shuffle
-  for (let i = zoneIndices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [zoneIndices[i], zoneIndices[j]] = [zoneIndices[j], zoneIndices[i]];
-  }
-
-  for (let k=0; k<zoneIndices.length && chosen.length < highlightCount; k++) {
-    const idx = zoneIndices[k];
-    // amplify chance per zone by p and zone-specific factor
-    const zoneFactor = 0.6 + 0.8 * Math.random(); // small randomness per zone
-    if (Math.random() < (p * zoneFactor)) {
-      chosen.push(zones[idx]);
-    }
-  }
-
-  // ensure at least one if highlightCount>0 and none chosen
-  if (highlightCount > 0 && chosen.length === 0) {
-    chosen.push(zones[ zoneIndices[0] ]);
-  }
-
-  // draw highlights with glow/animation-like strokes
-  chosen.forEach((z, idx) => {
-    // color gradient based on probability
-    const urgency = p > 0.7 ? 1.0 : (p > 0.4 ? 0.6 : 0.35);
-    const baseColor = p > 0.7 ? [231,76,60] : [241,196,15]; // red or yellow
-    const alpha = 0.6 + 0.2 * Math.random();
-    ctx.save();
-    ctx.translate(z.cx, z.cy);
-    ctx.rotate(z.angle);
-    // glow
-    const grd = ctx.createRadialGradient(0,0,0, 0,0, Math.max(z.w,z.h));
-    grd.addColorStop(0, `rgba(${baseColor[0]},${baseColor[1]},${baseColor[2]},${alpha})`);
-    grd.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, z.w/2 + 18*(idx+1), z.h/2 + 8*(idx+1), 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // main fill
-    ctx.fillStyle = `rgba(${baseColor[0]},${baseColor[1]},${baseColor[2]},${alpha})`;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, z.w/2, z.h/2, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // outline
-    ctx.strokeStyle = `rgba(0,0,0,0.18)`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // label
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 12px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Risk", 0, 4);
-    ctx.restore();
-  });
-
-  // If no highlights, draw a soft "All clear" badge
-  if (chosen.length === 0) {
-    ctx.save();
-    ctx.fillStyle = "rgba(39,174,96,0.12)";
-    ctx.beginPath();
-    ctx.roundRect = function(x,y,w,h,r){
-      if (w<2*r) r = w/2;
-      if (h<2*r) r = h/2;
-      this.moveTo(x+r,y);
-      this.arcTo(x+w,y,x+w,y+h,r);
-      this.arcTo(x+w,y+h,x,y+h,r);
-      this.arcTo(x,y+h,x,y,r);
-      this.arcTo(x,y,x+w,y,r);
-    }
-    // simple rounded rect fallback
-    const bx = w - 160, by = 18, bw = 130, bh = 36, br = 8;
-    ctx.fillStyle = "rgba(39,174,96,0.12)";
-    ctx.beginPath();
-    ctx.moveTo(bx+br, by);
-    ctx.arcTo(bx+bw, by, bx+bw, by+bh, br);
-    ctx.arcTo(bx+bw, by+bh, bx, by+bh, br);
-    ctx.arcTo(bx, by+bh, bx, by, br);
-    ctx.arcTo(bx, by, bx+bw, by, br);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#27ae60";
-    ctx.font = "600 14px sans-serif";
-    ctx.fillText("All Clear", bx + bw/2, by + bh/2 + 5);
-    ctx.restore();
-  }
-
-  // subtle footer label with probability
-  ctx.fillStyle = "#444";
-  ctx.font = "13px sans-serif";
-  ctx.fillText(`Simulation risk: ${(p*100).toFixed(1)}%`, 12, h - 14);
+  document.getElementById('allClearBadge').style.display = 'none';
+  document.getElementById('mineStatus').innerText = 'Simulation status will update after each slider change.';
 }
+
+// main update function
+function updateMineHighlights(prob){
+  // clamp
+  const p = Math.max(0, Math.min(1, prob || 0));
+  resetMineHighlights();
+
+  // decide number of highlights
+  let count = 0;
+  if (p < 0.12) {
+    count = (Math.random() < p*2) ? 1 : 0; // very unlikely
+  } else if (p < 0.4) {
+    count = (Math.random() < p*1.1) ? 1 : 0;
+  } else if (p < 0.7) {
+    count = (Math.random() < p) ? 1 : 0;
+  } else {
+    const r = Math.random();
+    if (r < 0.6) count = 1;
+    else if (r < 0.95) count = 2;
+    else count = 3;
+  }
+
+  if (count === 0) {
+    // all-clear UI
+    document.getElementById('allClearBadge').style.display = 'inline-block';
+    document.getElementById('mineStatus').innerText = 'Most likely no rockfall — all clear.';
+    return;
+  }
+
+  // choose distinct zones randomly (shuffle indices)
+  const indices = [...Array(zoneIds.length).keys()];
+  for (let i = indices.length -1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  // choose 'count' zones from shuffled list, but weight chance by p and a small zone factor
+  const chosen = [];
+  for (let k=0; k<indices.length && chosen.length < count; k++){
+    const idx = indices[k];
+    const zoneFactor = 0.6 + 0.8*Math.random();
+    if (Math.random() < Math.min(1, p * zoneFactor + 0.05)) {
+      chosen.push(zoneIds[idx]);
+    }
+  }
+  // ensure at least one if none chosen but count>0
+  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]);
+
+  // Apply highlights. For highest-prob zones use red + pulse, for others yellow
+  // Sort chosen so first is most "critical"
+  for (let i=0;i<chosen.length;i++){
+    const id = chosen[i];
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (p >= 0.75 && i===0) {
+      el.classList.add('highlight-red');
+      // show pulse circle (if exists)
+      const pulse = document.getElementById('pulse-'+id);
+      if (pulse) { pulse.style.display = 'block'; pulse.style.opacity = '0.95'; }
+    } else {
+      el.classList.add('highlight-yellow');
+      const pulse = document.getElementById('pulse-'+id);
+      if (pulse) { pulse.style.display = 'block'; pulse.style.opacity = '0.6'; }
+    }
+  }
+
+  document.getElementById('mineStatus').innerText = `Highlighted ${chosen.length} zone(s) — risk ${(p*100).toFixed(1)}%`;
+}
+
+// End of script
 </script>
 </body>
 </html>
-
