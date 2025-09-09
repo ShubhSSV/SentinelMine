@@ -38,6 +38,7 @@
 
     .all-clear-badge { display:inline-block; padding:6px 10px; border-radius:8px; background:rgba(39,174,96,0.12); color:#27ae60; font-weight:600; margin-top:6px; }
     .minimap-wrap { margin-top:12px; }
+    .debug-box { background:#f8f9fa; padding:8px; border-radius:6px; white-space:pre-wrap; font-size:12px; color:#333; }
   </style>
 </head>
 <body>
@@ -84,8 +85,8 @@
     <div class="mt-5">
       <h4>⛏️ Mine Risk Map (top view)</h4>
       <div class="minimap-wrap">
-        <svg id="mineSvg" class="mine-svg" viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg">
-          <!-- Cone-shaped terraces (outer to inner) -->
+        <svg id="mineSvg" class="mine-svg" viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg" aria-label="Top view open pit mine">
+          <!-- Cone-shaped terraces (outer to inner) - stroke rings so inner rings visible -->
           <ellipse cx="360" cy="210" rx="250" ry="66" fill="none" stroke="#dfe6e9" stroke-width="18"/>
           <ellipse cx="360" cy="210" rx="190" ry="50" fill="none" stroke="#e9ecef" stroke-width="14"/>
           <ellipse cx="360" cy="210" rx="140" ry="36" fill="none" stroke="#d6d6d6" stroke-width="12"/>
@@ -93,7 +94,7 @@
           <ellipse cx="360" cy="210" rx="70" ry="20" fill="#9ea7aa"/>
 
           <!-- Zones -->
-          <g id="zonesGroup">
+          <g id="zonesGroup" aria-hidden="false">
             <ellipse id="Z1" class="zone" cx="250" cy="210" rx="60" ry="20"/>
             <text x="250" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
 
@@ -112,7 +113,21 @@
             <ellipse id="Z6" class="zone" cx="360" cy="120" rx="50" ry="16"/>
             <text x="360" y="120" class="zone-label" text-anchor="middle" dy="4">Z6</text>
           </g>
+
+          <!-- Pulse circles (hidden by default) -->
+          <g id="pulseGroup" pointer-events="none">
+            <circle id="pulse-Z1" cx="250" cy="210" r="50" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z2" cx="360" cy="170" r="62" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z3" cx="480" cy="200" r="44" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z4" cx="300" cy="260" r="74" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z5" cx="420" cy="250" r="66" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z6" cx="360" cy="120" r="38" class="pulse-circle" style="display:none;"/>
+          </g>
         </svg>
+      </div>
+      <div style="margin-top:6px;">
+        <span id="allClearBadge" class="all-clear-badge" style="display:none;">All Clear</span>
+        <span id="mineStatus" class="small-muted" style="margin-left:8px;">Simulation status will update after each slider change.</span>
       </div>
       <p class="mine-caption">Top view schematic: inner pit is narrow, outer terraces are broad. Highlighted zones indicate likely landslide/rockfall.</p>
     </div>
@@ -124,7 +139,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="fullHistoryModalLabel">Full Prediction History</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <ul class="list-group" id="fullHistoryList"></ul>
@@ -137,9 +152,193 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-  /* JS is same as before (prediction, history, gauge, mine highlight) */
-  </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* Full JS: creates sliders, handles predictions, updates gauge, history and SVG highlights.
+   This is the same logic we used earlier — restored fully so UI works again. */
+
+const features = {{ features|tojson }};
+const formDiv = document.getElementById('form');
+const fullHistory = [];
+
+// Build UI controls
+features.forEach(f => {
+  const col = document.createElement('div'); col.className='col-md-6';
+  const card = document.createElement('div'); card.className='feature-card';
+
+  const label = document.createElement('label'); label.innerText = f.name; label.className='form-label';
+  card.appendChild(label);
+
+  if (f.type === 'numeric') {
+    const input = document.createElement('input'); input.type='range'; input.className='form-range';
+    input.min = f.min_r; input.max = f.max_r; input.step = Math.max((f.max_r - f.min_r)/100.0, 0.0001);
+    input.value = f.mean_r; input.id = 'inp_' + f.name;
+
+    const valspan = document.createElement('span'); valspan.id = 'val_' + f.name; valspan.innerText = Number(input.value).toFixed(3);
+
+    input.oninput = () => { valspan.innerText = Number(input.value).toFixed(3); makePredict(); };
+
+    card.appendChild(input); card.appendChild(document.createElement('br')); card.appendChild(valspan);
+  } else {
+    const sel = document.createElement('select'); sel.className='form-select'; sel.id='inp_'+f.name;
+    (f.options||[]).forEach(opt => { const o=document.createElement('option'); o.value=opt; o.text=opt; sel.appendChild(o); });
+    sel.onchange = makePredict; card.appendChild(sel);
+  }
+
+  col.appendChild(card); formDiv.appendChild(col);
+});
+
+// Chart gauge
+let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+  type: 'doughnut',
+  data: { labels:['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
+  options: { cutout:'70%', plugins:{ legend:{ display:false } } }
+});
+
+// History helpers
+function renderRecent() {
+  const list = document.getElementById('historyList'); list.innerHTML='';
+  const recent = fullHistory.slice(0,5);
+  if (recent.length === 0) {
+    const li = document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history yet — move sliders to generate predictions'; list.appendChild(li); return;
+  }
+  recent.forEach(it => {
+    const li = document.createElement('li'); li.className='list-group-item';
+    li.innerHTML = `<strong>${it.ts}</strong> → ${it.alert} <span class="small-muted">(${(it.prob*100).toFixed(1)}%)</span><div class="small-muted">${it.message}</div>`;
+    list.appendChild(li);
+  });
+}
+function renderFullHistory() {
+  const full = document.getElementById('fullHistoryList'); full.innerHTML='';
+  if (fullHistory.length === 0) {
+    const li=document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history available'; full.appendChild(li); return;
+  }
+  fullHistory.forEach(it => {
+    const li=document.createElement('li'); li.className='list-group-item';
+    const dbg = JSON.stringify(it.debug||{}, null, 2);
+    li.innerHTML = `<div class="d-flex justify-content-between"><div><strong>${it.ts}</strong> → ${it.alert} <small class="small-muted">(${(it.prob*100).toFixed(1)}%)</small></div><div><small class="small-muted">${it.message}</small></div></div><pre class="debug-box mt-2">${dbg}</pre>`;
+    full.appendChild(li);
+  });
+}
+
+// clear history
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+    if (!confirm('Clear the full history? This cannot be undone in this session.')) return;
+    fullHistory.length = 0; renderRecent(); renderFullHistory();
+  });
+});
+
+// prediction
+async function makePredict(){
+  const payload = {};
+  features.forEach(f => {
+    const el = document.getElementById('inp_' + f.name);
+    if (!el) return;
+    payload[f.name] = (f.type === 'numeric') ? parseFloat(el.value) : el.value;
+  });
+
+  try {
+    const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const j = await res.json();
+
+    document.getElementById('output').style.display = 'block';
+    document.getElementById('probVal').innerText = (j.probability*100).toFixed(2) + '%';
+    document.getElementById('messageText').innerText = j.message;
+
+    const alertBox = document.getElementById('alertBox'), led = document.getElementById('led'), alertText = document.getElementById('alertText');
+    if (j.alert === 'GREEN') { alertBox.className='result-box green'; led.style.background='#145a32'; alertText.innerText=' SAFE'; }
+    else if (j.alert === 'YELLOW') { alertBox.className='result-box yellow'; led.style.background='#b7950b'; alertText.innerText=' POTENTIAL RISK'; }
+    else { alertBox.className='result-box red'; led.style.background='#7b241c'; alertText.innerText=' HIGH RISK'; }
+
+    // gauge
+    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update();
+
+    // history
+    const entry = { ts: new Date().toLocaleString(), alert: j.alert, prob: j.probability, message: j.message, debug: j.debug||{} };
+    fullHistory.unshift(entry); if (fullHistory.length>500) fullHistory.pop();
+    renderRecent(); renderFullHistory();
+
+    // update SVG highlights
+    updateMineHighlights(j.probability);
+
+  } catch(err) {
+    console.error('Prediction error', err);
+  }
+}
+
+// initial predict on load
+document.addEventListener('DOMContentLoaded', () => { makePredict(); });
+
+// SVG highlight logic (toggle classes only)
+const zoneIds = ['Z1','Z2','Z3','Z4','Z5','Z6'];
+
+function resetMineHighlights(){
+  zoneIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('highlight-red','highlight-yellow');
+    const pulse = document.getElementById('pulse-'+id);
+    if (pulse) pulse.style.display='none';
+  });
+  document.getElementById('allClearBadge').style.display='none';
+  document.getElementById('mineStatus').innerText = 'Simulation status will update after each slider change.';
+}
+
+function updateMineHighlights(prob){
+  const p = Math.max(0, Math.min(1, prob || 0));
+  resetMineHighlights();
+
+  let count = 0;
+  if (p < 0.12) count = (Math.random() < p*2) ? 1 : 0;
+  else if (p < 0.4) count = (Math.random() < p*1.1) ? 1 : 0;
+  else if (p < 0.7) count = (Math.random() < p) ? 1 : 0;
+  else {
+    const r = Math.random();
+    if (r < 0.6) count = 1;
+    else if (r < 0.95) count = 2;
+    else count = 3;
+  }
+
+  if (count === 0) {
+    document.getElementById('allClearBadge').style.display='inline-block';
+    document.getElementById('mineStatus').innerText = 'Most likely no rockfall — all clear.';
+    return;
+  }
+
+  const indices = [...Array(zoneIds.length).keys()];
+  for (let i = indices.length -1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  const chosen = [];
+  for (let k=0; k<indices.length && chosen.length < count; k++){
+    const idx = indices[k];
+    const zoneFactor = 0.6 + 0.8*Math.random();
+    if (Math.random() < Math.min(1, p * zoneFactor + 0.05)) chosen.push(zoneIds[idx];
+  }
+  // fallback ensure
+  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]);
+
+  for (let i=0;i<chosen.length;i++){
+    const id = chosen[i]; const el = document.getElementById(id);
+    if (!el) continue;
+    if (p >= 0.75 && i===0) {
+      el.classList.add('highlight-red');
+      const pulse = document.getElementById('pulse-'+id); if (pulse) pulse.style.display='block';
+    } else {
+      el.classList.add('highlight-yellow');
+      const pulse = document.getElementById('pulse-'+id); if (pulse) pulse.style.display='block';
+    }
+  }
+
+  document.getElementById('mineStatus').innerText = `Highlighted ${chosen.length} zone(s) — risk ${(p*100).toFixed(1)}%`;
+}
+
+// ensure full history modal refreshes
+const fullHistoryModal = document.getElementById('fullHistoryModal');
+if (fullHistoryModal) fullHistoryModal.addEventListener('show.bs.modal', renderFullHistory);
+</script>
 </body>
 </html>
