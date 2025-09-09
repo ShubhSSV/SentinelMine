@@ -1,5 +1,5 @@
 #JAI SHREE GANESH
-# app.py
+# app.py (updated: better demo weighting, slider scaling, damped weights, adaptive blending)
 import json
 from pathlib import Path
 import joblib
@@ -20,10 +20,15 @@ MODEL_DIR = Path("model_out")
 MODEL_PIPELINE_PATH = MODEL_DIR / "model_pipeline.pkl"
 METADATA_PATH = MODEL_DIR / "metadata.json"
 
-# Blend factor between real model and demo-derived score.
-# 0.0 -> only demo_score (fully synthetic)
-# 1.0 -> only model_proba (fully model-driven)
+# Blend factor between real model and demo-derived score (base).
 BLEND_ALPHA = float(os.environ.get("BLEND_ALPHA", 0.6))  # default 0.6
+
+# Minimum model weight when model is uncertain
+BLEND_ALPHA_MIN = float(os.environ.get("BLEND_ALPHA_MIN", 0.20))
+
+# damping & variance influence hyperparameters (tunable)
+WEIGHT_GAMMA = float(os.environ.get("WEIGHT_GAMMA", 0.6))   # gamma < 1 reduces dominance
+VAR_BETA = float(os.environ.get("VAR_BETA", 0.35))         # influence of normalized variance
 
 # Alert thresholds
 THRESHOLD_GREEN = 0.30
@@ -75,27 +80,41 @@ else:
     feature_values = {}
 
 # -------------------------------
-# Auto-compute demo weights from dataset correlations
+# Auto-compute demo weights from dataset correlations + variance (improved)
 # -------------------------------
-feature_weights = {}   # normalized absolute-correlation weights (sum to 1)
+feature_weights = {}   # normalized weights
 feature_sign = {}      # +1 or -1 indicating direction
-minmax_map = {}        # {feature: {'min':..., 'max':...}}
+minmax_map = {}        # {feature: {'min':..., 'max':..., 'mean':...}}
+_feature_var = {}      # raw variance map (for internal use)
 
 if DATA_CSV.exists():
     try:
         df_raw = pd.read_csv(DATA_CSV)
         if TARGET_COL in df_raw.columns:
-            # Convert target to numeric
             df_raw[TARGET_COL] = pd.to_numeric(df_raw[TARGET_COL], errors='coerce')
-            # Only consider numeric features present in df_raw
+
             corr_map = {}
+            var_map = {}
+            # compute stats for each numeric feature
             for f in numeric_feats:
                 if f in df_raw.columns:
                     s = pd.to_numeric(df_raw[f], errors='coerce')
-                    minmax_map[f] = {
-                        "min": float(np.nanmin(s)) if s.notna().any() else 0.0,
-                        "max": float(np.nanmax(s)) if s.notna().any() else 1.0
-                    }
+                    # store min/max/mean
+                    try:
+                        mn = float(np.nanmin(s)) if s.notna().any() else 0.0
+                        mx = float(np.nanmax(s)) if s.notna().any() else 1.0
+                        meanv = float(np.nanmean(s)) if s.notna().any() else 0.0
+                    except Exception:
+                        mn, mx, meanv = 0.0, 1.0, 0.0
+                    minmax_map[f] = {"min": mn, "max": mx, "mean": meanv}
+                    # variance (for importance modulation)
+                    try:
+                        v = float(np.nanvar(s)) if s.notna().any() else 0.0
+                    except Exception:
+                        v = 0.0
+                    var_map[f] = v
+                    _feature_var[f] = v
+                    # correlation with target
                     try:
                         corr = float(s.corr(df_raw[TARGET_COL]))
                     except Exception:
@@ -104,31 +123,45 @@ if DATA_CSV.exists():
                         corr = 0.0
                     corr_map[f] = corr
                 else:
-                    # Feature missing from csv -> fallback defaults
+                    # defaults
+                    minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
                     corr_map[f] = 0.0
-                    minmax_map[f] = {"min": 0.0, "max": 1.0}
+                    var_map[f] = 0.0
+                    _feature_var[f] = 0.0
 
-            # If all correlations zero, fall back to uniform weights
-            abs_corrs = {f: abs(v) for f, v in corr_map.items()}
-            total = sum(abs_corrs.values())
+            # normalize variance to 0..1
+            max_var = max(var_map.values()) if len(var_map) > 0 else 0.0
+            var_norm = {f: (var_map[f] / max_var) if max_var > 0 else 0.0 for f in var_map}
+
+            # combined importance: |corr| * (1 + VAR_BETA * var_norm)
+            combined = {}
+            for f in numeric_feats:
+                combined_val = abs(corr_map.get(f, 0.0)) * (1.0 + VAR_BETA * var_norm.get(f, 0.0))
+                combined[f] = combined_val
+
+            # apply gamma damping to reduce dominance of top features
+            # then normalize the weights
+            gamma = WEIGHT_GAMMA if WEIGHT_GAMMA > 0 else 1.0
+            damped = {f: (combined[f] ** gamma) for f in combined}
+            total = sum(damped.values())
             if total <= 0:
-                # uniform
                 n = len(numeric_feats) if numeric_feats else 1
                 for f in numeric_feats:
                     feature_weights[f] = 1.0 / n
                     feature_sign[f] = 1
             else:
-                for f, v in abs_corrs.items():
+                for f, v in damped.items():
                     feature_weights[f] = v / total
-                    feature_sign[f] = 1 if corr_map[f] >= 0 else -1
-            print("✅ Derived demo weights from correlations:", feature_weights)
+                    feature_sign[f] = 1 if corr_map.get(f, 0.0) >= 0 else -1
+
+            print("✅ Derived improved demo weights:", feature_weights)
         else:
-            # Target not present - fallback to uniform
+            # fallback uniform
             n = len(numeric_feats) if numeric_feats else 1
             for f in numeric_feats:
                 feature_weights[f] = 1.0 / n
                 feature_sign[f] = 1
-                minmax_map[f] = {"min": 0.0, "max": 1.0}
+                minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
             print("⚠️ Target column not in CSV. Using uniform demo weights.")
     except Exception as ex:
         print("⚠️ Could not compute correlations from dataset:", ex)
@@ -137,20 +170,20 @@ if DATA_CSV.exists():
         for f in numeric_feats:
             feature_weights[f] = 1.0 / n
             feature_sign[f] = 1
-            minmax_map[f] = {"min": 0.0, "max": 1.0}
+            minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
 else:
     # No CSV: fallback uniform weights and defaults
     n = len(numeric_feats) if numeric_feats else 1
     for f in numeric_feats:
         feature_weights[f] = 1.0 / n
         feature_sign[f] = 1
-        minmax_map[f] = {"min": 0.0, "max": 1.0}
+        minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
     print("⚠️ Dataset not found. Using uniform demo weights and default ranges.")
 
-# For numeric features not present in minmax_map, set default
+# ensure defaults exist
 for f in numeric_feats:
     if f not in minmax_map:
-        minmax_map[f] = {"min": 0.0, "max": 1.0}
+        minmax_map[f] = {"min": 0.0, "max": 1.0, "mean": 0.0}
     if f not in feature_weights:
         feature_weights[f] = 0.0
     if f not in feature_sign:
@@ -185,46 +218,75 @@ def index():
     return render_template("index.html", features=feature_descriptors)
 
 
+def _interpret_slider_value(raw_val, f):
+    """
+    Interpret incoming slider value consistently:
+    - If frontend uses 0..100 while real min/max != 0..100, treat as percentage of real range.
+    - Otherwise assume value is already in real units.
+    """
+    try:
+        val = float(raw_val)
+    except Exception:
+        return 0.0
+    mm = minmax_map.get(f, {"min": 0.0, "max": 1.0})
+    minv, maxv = mm["min"], mm["max"]
+    # If slider 0..100 but actual range not 0..100, treat as percent
+    if 0.0 <= val <= 100.0 and (maxv - minv) != 100.0:
+        return minv + (val / 100.0) * (maxv - minv)
+    return val
+
+
 def compute_demo_score(input_values: dict) -> float:
     """
-    Compute a demo score in [0,1] using normalized feature values and correlation-derived weights.
-    If a feature has negative correlation, its effect is inverted (more value => less risk).
+    Compute a demo score in [0,1] using normalized feature values and improved weights.
+    Uses interpreted slider values, feature_sign, and the damped normalized weights.
     """
     score = 0.0
     for f, w in feature_weights.items():
-        # Skip zero-weight features
         if w <= 0:
             continue
         raw_val = input_values.get(f, 0.0)
-        try:
-            val = float(raw_val)
-        except Exception:
-            val = 0.0
+        val_actual = _interpret_slider_value(raw_val, f)
         mm = minmax_map.get(f, {"min": 0.0, "max": 1.0})
         minv = mm["min"]
         maxv = mm["max"]
-        # normalize safely
         if maxv > minv:
-            val_norm = (val - minv) / (maxv - minv)
+            val_norm = (val_actual - minv) / (maxv - minv)
         else:
             val_norm = 0.0
         val_norm = float(max(0.0, min(1.0, val_norm)))
         if feature_sign.get(f, 1) < 0:
-            # negative correlation => high value reduces risk
             contrib = (1.0 - val_norm) * w
         else:
             contrib = val_norm * w
         score += contrib
-    # score should already be in [0,1] if weights sum to 1
     score = float(max(0.0, min(1.0, score)))
     return score
+
+
+def _adaptive_alpha(model_proba, base_alpha):
+    """
+    Adaptive alpha: reduce model weight when model is uncertain (near 0.5).
+    - model_proba in [0,1]
+    - base_alpha the configured BLEND_ALPHA
+    returns effective alpha in [BLEND_ALPHA_MIN, base_alpha]
+    """
+    if model_proba is None:
+        return 0.0
+    conf = abs(model_proba - 0.5) * 2.0  # 0 when p=0.5, 1 when p=0 or 1
+    # scale alpha by confidence
+    alpha_eff = max(BLEND_ALPHA_MIN, base_alpha * conf)
+    return float(max(0.0, min(1.0, alpha_eff)))
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
     data = request.json or {}
     # Build a single-row DataFrame for the model (if available)
-    df_row = pd.DataFrame([data])
+    # Note: df_row uses raw incoming values — the model pipeline expects the same units used during training.
+    df_row = pd.DataFrame([{
+        f: _interpret_slider_value(data.get(f, 0.0), f) for f in numeric_feats
+    }])
 
     # Model probability (if pipeline present)
     model_proba = None
@@ -242,12 +304,12 @@ def predict():
     # Demo-derived probability from correlations and normalized slider values
     demo_proba = compute_demo_score(data)
 
-    # Blend model and demo probabilities
+    # Blend model and demo probabilities with adaptive alpha
     if model_proba is None:
         final_proba = demo_proba
     else:
-        alpha = BLEND_ALPHA
-        final_proba = float(max(0.0, min(1.0, alpha * model_proba + (1.0 - alpha) * demo_proba)))
+        alpha_eff = _adaptive_alpha(model_proba, BLEND_ALPHA)
+        final_proba = float(max(0.0, min(1.0, alpha_eff * model_proba + (1.0 - alpha_eff) * demo_proba)))
 
     # Decide alert label
     if final_proba < THRESHOLD_GREEN:
@@ -266,6 +328,7 @@ def predict():
         "demo_proba": float(demo_proba),
         "final_proba": float(final_proba),
         "weights": feature_weights,
+        "feature_var": _feature_var
     }
 
     return jsonify({
@@ -283,4 +346,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     # Flask dev server is OK for demo; do not use in production
     app.run(host="0.0.0.0", port=port, debug=False)
-
