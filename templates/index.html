@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>SentinelMine — AI Disaster Risk Prediction</title>
+  <title>SentinelMine — AI Disaster Risk Prediction (Zones & Pulses Fixed)</title>
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -19,23 +19,26 @@
     #history { margin-top:30px; }
     .small-muted { font-size:0.85rem; color:#6c757d; }
     .mine-caption { font-size:0.9rem; color:#555; margin-top:8px; }
-    .mine-svg { width:100%; max-width:720px; height:auto; display:block; margin-top:12px; }
-    .zone { fill: rgba(255,255,255,0.03); stroke: rgba(0,0,0,0.08); stroke-width:1; transition: fill 300ms ease, filter 300ms ease, transform 300ms ease; }
-    .zone-label { font-size:12px; fill:#222; pointer-events:none; }
+
+    .mine-svg { width:100%; max-width:920px; height:auto; display:block; margin-top:12px; }
+    .zone { fill: rgba(255,255,255,0.03); stroke: rgba(0,0,0,0.08); stroke-width:1.4; transition: fill 300ms ease, filter 300ms ease, transform 300ms ease; }
+    .zone-label { font-size:12px; fill:#222; pointer-events:none; font-weight:600; }
     .zone.highlight-yellow { fill: rgba(241,196,15,0.55); filter: drop-shadow(0 6px 14px rgba(241,196,15,0.18)); transform: scale(1.03); }
     .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
-    /* Inward pulse animation */
+
+    /* pulse: expand slightly AND drift inward toward pit center */
     @keyframes pulse-landslide {
-      0%   { transform: scale(0.6) translate(0,0); opacity: 0.9; }
-      50%  { transform: scale(1.2) translate(calc((360px - var(--cx)) * 0.08), calc((210px - var(--cy)) * 0.08)); opacity: 0.6; }
-      100% { transform: scale(1.6) translate(calc((360px - var(--cx)) * 0.15), calc((210px - var(--cy)) * 0.15)); opacity: 0; }
+      0%   { transform: scale(0.7) translate(0,0); opacity: 0.9; }
+      45%  { transform: scale(1.05) translate(calc((360px - var(--cx)) * 0.05), calc((210px - var(--cy)) * 0.05)); opacity: 0.65; }
+      100% { transform: scale(1.35) translate(calc((360px - var(--cx)) * 0.12), calc((210px - var(--cy)) * 0.12)); opacity: 0; }
     }
 
     .pulse-circle {
-      fill: rgba(231,76,60,0.28);
+      fill: rgba(231,76,60,0.22);
       transform-origin: center;
-      animation: pulse-landslide 2.4s infinite ease-out;
-      filter: drop-shadow(0 0 10px rgba(231,76,60,0.65));
+      animation: pulse-landslide 2.6s infinite ease-out;
+      filter: drop-shadow(0 0 8px rgba(231,76,60,0.45));
+      pointer-events: none;
     }
 
     .all-clear-badge { display:inline-block; padding:6px 10px; border-radius:8px; background:rgba(39,174,96,0.12); color:#27ae60; font-weight:600; margin-top:6px; }
@@ -49,6 +52,7 @@
       <a class="navbar-brand">⛏️ SentinelMine Risk Monitor</a>
     </div>
   </nav>
+
   <div class="container mt-4">
     <div class="row">
       <!-- Input (left) -->
@@ -56,6 +60,7 @@
         <h4 class="mb-3">⚙️ Sensor Controls</h4>
         <div class="row" id="form"></div>
       </div>
+
       <!-- Output (right) -->
       <div class="col-md-6">
         <h4 class="mb-3">📊 Prediction Result</h4>
@@ -67,6 +72,7 @@
             <p class="mt-2">Risk Probability: <span id="probVal"></span></p>
           </div>
         </div>
+
         <div id="history" class="mt-4">
           <h5>📜 Recent Predictions</h5>
           <ul class="list-group" id="historyList"></ul>
@@ -79,87 +85,22 @@
         </div>
       </div>
     </div>
+
     <!-- Mine (SVG top-view) -->
     <div class="minimap-wrap">
       <svg id="mineSvg" class="mine-svg" viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg" aria-label="Top view open pit mine">
-        <!-- Concentric terraces (outer to inner, all centered at 360,210) -->
+        <!-- Concentric terraces (outer to inner) - centered at 360,210 -->
         <ellipse cx="360" cy="210" rx="250" ry="66" fill="none" stroke="#dfe6e9" stroke-width="18"/>
         <ellipse cx="360" cy="210" rx="190" ry="50" fill="none" stroke="#e9ecef" stroke-width="14"/>
         <ellipse cx="360" cy="210" rx="140" ry="36" fill="none" stroke="#d6d6d6" stroke-width="12"/>
         <ellipse cx="360" cy="210" rx="100" ry="28" fill="none" stroke="#cfcfcf" stroke-width="12"/>
         <ellipse cx="360" cy="210" rx="70" ry="20" fill="#9ea7aa"/>
-        <!-- Zones, precisely aligned over each terrace -->
-        <!-- Zones, symmetrically arranged -->
-        <g id="zonesGroup">
-          <!-- Left -->
-          <ellipse id="Z1" class="zone" cx="240" cy="210" rx="55" ry="20"/>
-          <text x="240" y="210" class="zone-label" text-anchor="middle" dy="6">Z1</text>
 
-          <!-- Top-left -->
-          <ellipse id="Z2" class="zone" cx="285" cy="150" rx="55" ry="20"/>
-          <text x="285" y="150" class="zone-label" text-anchor="middle" dy="6">Z2</text>
-
-          <!-- Top -->
-          <ellipse id="Z3" class="zone" cx="360" cy="135" rx="55" ry="20"/>
-          <text x="360" y="135" class="zone-label" text-anchor="middle" dy="6">Z3</text>
-
-          <!-- Top-right -->
-          <ellipse id="Z4" class="zone" cx="435" cy="150" rx="55" ry="20"/>
-          <text x="435" y="150" class="zone-label" text-anchor="middle" dy="6">Z4</text>
-
-          <!-- Right -->
-          <ellipse id="Z5" class="zone" cx="480" cy="210" rx="55" ry="20"/>
-          <text x="480" y="210" class="zone-label" text-anchor="middle" dy="6">Z5</text>
-
-          <!-- Bottom-right -->
-          <ellipse id="Z6" class="zone" cx="435" cy="270" rx="55" ry="20"/>
-          <text x="435" y="270" class="zone-label" text-anchor="middle" dy="6">Z6</text>
-
-          <!-- Bottom -->
-          <ellipse id="Z7" class="zone" cx="360" cy="285" rx="55" ry="20"/>
-          <text x="360" y="285" class="zone-label" text-anchor="middle" dy="6">Z7</text>
-
-          <!-- Bottom-left -->
-          <ellipse id="Z8" class="zone" cx="285" cy="270" rx="55" ry="20"/>
-          <text x="285" y="270" class="zone-label" text-anchor="middle" dy="6">Z8</text>
-        </g>
-
-
-
-        <!-- Pulse circles for each zone -->
-        <!-- Pulse circles (matched to zones) -->
-        <g id="pulseGroup" pointer-events="none">
-          <circle id="pulse-Z1" cx="240" cy="210" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:240px; --cy:210px; display:none;"/>
-          <circle id="pulse-Z2" cx="285" cy="150" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:285px; --cy:150px; display:none;"/>
-          <circle id="pulse-Z3" cx="360" cy="135" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:360px; --cy:135px; display:none;"/>
-          <circle id="pulse-Z4" cx="435" cy="150" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:435px; --cy:150px; display:none;"/>
-          <circle id="pulse-Z5" cx="480" cy="210" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:480px; --cy:210px; display:none;"/>
-          <circle id="pulse-Z6" cx="435" cy="270" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:435px; --cy:270px; display:none;"/>
-          <circle id="pulse-Z7" cx="360" cy="285" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:360px; --cy:285px; display:none;"/>
-          <circle id="pulse-Z8" cx="285" cy="270" r="30" 
-                  class="pulse-circle" 
-                  style="--cx:285px; --cy:270px; display:none;"/>
-        </g>
-
-
-
-
+        <!-- Groups to be populated programmatically to match your sketch exactly -->
+        <g id="zonesGroup"></g>
+        <g id="pulseGroup" pointer-events="none"></g>
       </svg>
-   </div>
+    </div>
 
       <div style="margin-top:6px;">
         <span id="allClearBadge" class="all-clear-badge" style="display:none;">All Clear</span>
@@ -168,6 +109,7 @@
       <p class="mine-caption">Top view schematic: inner pit is narrow, outer terraces are broad. Highlighted zones indicate likely landslide/rockfall.</p>
     </div>
   </div>
+
   <!-- Full history modal -->
   <div class="modal fade" id="fullHistoryModal" tabindex="-1" aria-labelledby="fullHistoryModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
@@ -186,39 +128,111 @@
       </div>
     </div>
   </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-/* Frontend JS remains unchanged from your sample,
-   referencing the correct zone IDs as before */
-const features = {{ features|tojson }};
+// ---------- Dynamic zone + pulse builder (matches provided sketch) ----------
+// Parameters (tweak these values if you want the ring tighter/looser)
+const SVG_CX = 360, SVG_CY = 210;
+const ZONE_RING = { rx: 180, ry: 50 }; // ring where zone centers sit (matches terrace ring)
+const ZONE_LABEL_ORDER = ['Z8','Z6','Z3','Z5','Z7','Z4','Z1','Z2']; // clockwise, starting at top center to match sketch
+const ZONE_COUNT = ZONE_LABEL_ORDER.length;
+const ZONE_RX = 70, ZONE_RY = 22; // size of each ellipse zone
+const PULSE_R = 30; // starting radius for pulses (kept smaller than zone ellipse)
+
+function buildZonesAndPulses() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const zonesGroup = document.getElementById('zonesGroup');
+  const pulseGroup = document.getElementById('pulseGroup');
+  zonesGroup.innerHTML = '';
+  pulseGroup.innerHTML = '';
+
+  for (let i = 0; i < ZONE_COUNT; i++) {
+    const label = ZONE_LABEL_ORDER[i];
+    const angle = -Math.PI/2 + i * (2 * Math.PI / ZONE_COUNT); // start at top and go clockwise
+    const cx = Math.round(SVG_CX + ZONE_RING.rx * Math.cos(angle));
+    const cy = Math.round(SVG_CY + ZONE_RING.ry * Math.sin(angle));
+
+    // zone ellipse
+    const ell = document.createElementNS(ns, 'ellipse');
+    ell.setAttribute('id', label);
+    ell.setAttribute('class', 'zone');
+    ell.setAttribute('cx', cx);
+    ell.setAttribute('cy', cy);
+    ell.setAttribute('rx', ZONE_RX);
+    ell.setAttribute('ry', ZONE_RY);
+    zonesGroup.appendChild(ell);
+
+    // label
+    const txt = document.createElementNS(ns, 'text');
+    txt.setAttribute('x', cx);
+    txt.setAttribute('y', cy);
+    txt.setAttribute('class', 'zone-label');
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dy', '6');
+    txt.textContent = label;
+    zonesGroup.appendChild(txt);
+
+    // pulse circle
+    const circ = document.createElementNS(ns, 'circle');
+    circ.setAttribute('id', 'pulse-' + label);
+    circ.setAttribute('cx', cx);
+    circ.setAttribute('cy', cy);
+    circ.setAttribute('r', PULSE_R);
+    circ.setAttribute('class', 'pulse-circle');
+    circ.setAttribute('style', `--cx:${cx}px; --cy:${cy}px; display:none;`);
+    pulseGroup.appendChild(circ);
+  }
+
+  // expose zoneIds to the rest of the script (used by highlight logic)
+  window.zoneIds = ZONE_LABEL_ORDER.slice();
+}
+
+// ---------- Page logic (controls, chart, highlights) ----------
+const features = {{ features|tojson }}; // server-injected feature list (keeps your original template)
 const formDiv = document.getElementById('form');
 const fullHistory = [];
-// Build controls
-features.forEach(f => {
-  const col = document.createElement('div'); col.className='col-md-6';
-  const card = document.createElement('div'); card.className='feature-card';
-  const label = document.createElement('label'); label.innerText=f.name; label.className='form-label';
-  card.appendChild(label);
-  if (f.type === 'numeric') {
-    const input = document.createElement('input'); input.type='range'; input.className='form-range';
-    input.min = f.min_r; input.max = f.max_r; input.step = Math.max((f.max_r - f.min_r)/100.0, 0.0001);
-    input.value = f.mean_r; input.id = 'inp_' + f.name;
-    const valspan = document.createElement('span'); valspan.id = 'val_' + f.name; valspan.innerText = Number(input.value).toFixed(3);
-    input.oninput = () => { valspan.innerText = Number(input.value).toFixed(3); makePredict(); };
-    card.appendChild(input); card.appendChild(document.createElement('br')); card.appendChild(valspan);
-  } else {
-    const sel = document.createElement('select'); sel.className='form-select'; sel.id = 'inp_' + f.name;
-    (f.options||[]).forEach(opt=>{ const o = document.createElement('option'); o.value=opt; o.text=opt; sel.appendChild(o); });
-    sel.onchange = makePredict; card.appendChild(sel);
-  }
-  col.appendChild(card); formDiv.appendChild(col);
-});
+
+// Build controls (same as original logic)
+function buildControls() {
+  // defensive: if features not provided (static preview), skip
+  if (!Array.isArray(features)) return;
+  features.forEach(f => {
+    const col = document.createElement('div'); col.className='col-md-6';
+    const card = document.createElement('div'); card.className='feature-card';
+    const label = document.createElement('label'); label.innerText=f.name; label.className='form-label';
+    card.appendChild(label);
+
+    if (f.type === 'numeric') {
+      const input = document.createElement('input'); input.type='range'; input.className='form-range';
+      input.min = f.min_r; input.max = f.max_r; input.step = Math.max((f.max_r - f.min_r)/100.0, 0.0001);
+      input.value = f.mean_r; input.id = 'inp_' + f.name;
+      const valspan = document.createElement('span'); valspan.id = 'val_' + f.name; valspan.innerText = Number(input.value).toFixed(3);
+      input.oninput = () => { valspan.innerText = Number(input.value).toFixed(3); makePredict(); };
+      card.appendChild(input); card.appendChild(document.createElement('br')); card.appendChild(valspan);
+    } else {
+      const sel = document.createElement('select'); sel.className='form-select'; sel.id = 'inp_' + f.name;
+      (f.options||[]).forEach(opt=>{ const o = document.createElement('option'); o.value=opt; o.text=opt; sel.appendChild(o); });
+      sel.onchange = makePredict; card.appendChild(sel);
+    }
+
+    col.appendChild(card); formDiv.appendChild(col);
+  });
+}
+
 // Chart gauge
-let gaugeChart = new Chart(document.getElementById('gaugeChart'), {
-  type:'doughnut',
-  data:{ labels:['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
-  options:{ cutout:'70%', plugins:{ legend:{ display:false } } }
-});
+let gaugeChart;
+function initGauge(){
+  const ctx = document.getElementById('gaugeChart');
+  if (!ctx) return;
+  gaugeChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:['Risk','Safe'], datasets:[{ data:[0,100], backgroundColor:['#e74c3c','#bdc3c7'], borderWidth:0 }] },
+    options:{ cutout:'70%', plugins:{ legend:{ display:false } } }
+  });
+}
+
 // History helpers
 function renderRecent(){
   const list = document.getElementById('historyList'); list.innerHTML = '';
@@ -244,6 +258,7 @@ function renderFullHistory(){
     full.appendChild(li);
   });
 }
+
 // Clear history
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clearHistoryBtn').addEventListener('click', () => {
@@ -251,42 +266,49 @@ document.addEventListener('DOMContentLoaded', () => {
     fullHistory.length = 0; renderRecent(); renderFullHistory();
   });
 });
-// Prediction
+
+// ---------- Prediction + highlight logic (adapted to dynamic zones) ----------
 async function makePredict(){
   const payload = {};
-  features.forEach(f => {
+  (Array.isArray(features) ? features : []).forEach(f => {
     const el = document.getElementById('inp_' + f.name);
     if (!el) return;
     payload[f.name] = (f.type === 'numeric') ? parseFloat(el.value) : el.value;
   });
+
   try {
     const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const j = await res.json();
+
     document.getElementById('output').style.display = 'block';
     document.getElementById('probVal').innerText = (j.probability*100).toFixed(2) + '%';
     document.getElementById('messageText').innerText = j.message;
+
     const alertBox = document.getElementById('alertBox'), led = document.getElementById('led'), alertText = document.getElementById('alertText');
     if (j.alert === 'GREEN') { alertBox.className='result-box green'; led.style.background='#145a32'; alertText.innerText=' SAFE'; }
     else if (j.alert === 'YELLOW') { alertBox.className='result-box yellow'; led.style.background='#b7950b'; alertText.innerText=' POTENTIAL RISK'; }
     else { alertBox.className='result-box red'; led.style.background='#7b241c'; alertText.innerText=' HIGH RISK'; }
+
     // update gauge
-    gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update();
+    if (gaugeChart) { gaugeChart.data.datasets[0].data = [j.probability*100, 100 - j.probability*100]; gaugeChart.update(); }
+
     // add to history
     const entry = { ts: new Date().toLocaleString(), alert: j.alert, prob: j.probability, message: j.message, debug: j.debug||{} };
     fullHistory.unshift(entry); if (fullHistory.length > 500) fullHistory.pop();
     renderRecent(); renderFullHistory();
+
     // update SVG highlights
     updateMineHighlights(j.probability);
+
   } catch(err) {
     console.error('Prediction error', err);
   }
 }
-// initial predict
-document.addEventListener('DOMContentLoaded', () => { makePredict(); });
-// SVG highlight logic
-const zoneIds = ['Z1','Z2','Z3','Z4','Z5','Z6','Z7','Z8'];
+
+// Highlight helpers (use dynamic window.zoneIds)
 function resetMineHighlights(){
-  zoneIds.forEach(id=>{
+  const ids = (window.zoneIds || []);
+  ids.forEach(id=>{
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('highlight-red','highlight-yellow');
@@ -298,9 +320,11 @@ function resetMineHighlights(){
   const status = document.getElementById('mineStatus');
   if (status) status.innerText = 'Simulation status will update after each slider change.';
 }
+
 function updateMineHighlights(prob){
   const p = Math.max(0, Math.min(1, prob || 0));
   resetMineHighlights();
+
   let count = 0;
   if (p < 0.12) count = (Math.random() < p*2) ? 1 : 0;
   else if (p < 0.4) count = (Math.random() < p*1.1) ? 1 : 0;
@@ -311,44 +335,50 @@ function updateMineHighlights(prob){
     else if (r < 0.95) count = 2;
     else count = 3;
   }
+
   if (count === 0) {
     const badge = document.getElementById('allClearBadge'); if (badge) badge.style.display = 'inline-block';
     const status = document.getElementById('mineStatus'); if (status) status.innerText = 'Most likely no rockfall — all clear.';
     return;
   }
+
   // shuffle indices
-  const indices = [...Array(zoneIds.length).keys()];
+  const ids = window.zoneIds || [];
+  const indices = [...Array(ids.length).keys()];
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
+
   const chosen = [];
   for (let k = 0; k < indices.length && chosen.length < count; k++){
     const idx = indices[k];
     const zoneFactor = 0.6 + 0.8 * Math.random();
     if (Math.random() < Math.min(1, p * zoneFactor + 0.05)) {
-      chosen.push(zoneIds[idx]);
+      chosen.push(ids[idx]);
     }
   }
-  if (chosen.length === 0) chosen.push(zoneIds[indices[0]]);
+  if (chosen.length === 0) chosen.push(ids[indices[0]]);
+
   for (let i = 0; i < chosen.length; i++){
     const id = chosen[i];
     const el = document.getElementById(id);
     if (!el) continue;
+    const pulse = document.getElementById('pulse-' + id);
     if (p >= 0.75 && i === 0) {
       el.classList.add('highlight-red');
-      const pulse = document.getElementById('pulse-' + id);
       if (pulse) pulse.style.display = 'block';
     } else {
       el.classList.add('highlight-yellow');
-      const pulse = document.getElementById('pulse-' + id);
       if (pulse) pulse.style.display = 'block';
     }
   }
+
   const status = document.getElementById('mineStatus');
   if (status) status.innerText = `Highlighted ${chosen.length} zone(s) — risk ${(p*100).toFixed(1)}%`;
 }
-// refresh full-history modal on open
+
+// When full-history modal opens
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('fullHistoryModal');
   if (modal) {
@@ -357,6 +387,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ---------- Initialize on DOM ready ----------
+document.addEventListener('DOMContentLoaded', () => {
+  // 1) build zones/pulses to match your sketch exactly
+  buildZonesAndPulses();
+  // 2) build controls (server will inject `features` array); safe to call even if features undefined
+  buildControls();
+  // 3) init chart
+  initGauge();
+  // 4) initial predict (if server endpoint available)
+  // small timeout so visuals are ready
+  setTimeout(()=>{ try{ if (typeof makePredict === 'function') makePredict(); } catch(e){} }, 300);
+});
 </script>
 </body>
 </html>
+
