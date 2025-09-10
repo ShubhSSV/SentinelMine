@@ -21,10 +21,29 @@
     .mine-caption { font-size:0.9rem; color:#555; margin-top:8px; }
 
     .mine-svg { width:100%; max-width:920px; height:auto; display:block; margin-top:12px; }
-    .zone { fill: rgba(255,255,255,0.03); stroke: rgba(0,0,0,0.08); stroke-width:1.4; transition: fill 300ms ease, filter 300ms ease, transform 300ms ease; }
-    .zone-label { font-size:12px; fill:#222; pointer-events:none; font-weight:600; }
-    .zone.highlight-yellow { fill: rgba(241,196,15,0.55); filter: drop-shadow(0 6px 14px rgba(241,196,15,0.18)); transform: scale(1.03); }
-    .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
+    .zone {
+      fill: rgba(255,255,255,0.03);
+      stroke: rgba(0,0,0,0.08);
+      stroke-width: 1;
+      transition: fill 300ms ease, filter 300ms ease, transform 300ms ease;
+
+      /* Fix the shifting issue */
+      transform-box: fill-box;      /* Ensures transform is calculated per element */
+      transform-origin: center;     /* Keeps scaling centered at ellipse center */
+    }
+
+    .zone.highlight-yellow {
+      fill: rgba(241,196,15,0.55);
+      filter: drop-shadow(0 6px 14px rgba(241,196,15,0.18));
+      transform: scale(1.03);
+    }
+
+    .zone.highlight-red {
+      fill: rgba(231,76,60,0.65);
+      filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22));
+      transform: scale(1.06);
+    }
+
 
     /* pulse: expand slightly AND drift inward toward pit center */
     @keyframes pulse-landslide {
@@ -403,4 +422,3 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
