@@ -91,44 +91,70 @@
         <!-- Zones, precisely aligned over each terrace -->
         <!-- Zones, symmetrically arranged -->
         <g id="zonesGroup">
-          <!-- Generate 8 zones at 45° intervals -->
-          <ellipse id="Z1" class="zone" cx="160" cy="210" rx="60" ry="20"/>
-          <text x="160" y="210" class="zone-label" text-anchor="middle" dy="6">Z1</text>
+          <!-- Left -->
+          <ellipse id="Z1" class="zone" cx="240" cy="210" rx="55" ry="20"/>
+          <text x="240" y="210" class="zone-label" text-anchor="middle" dy="6">Z1</text>
 
-          <ellipse id="Z2" class="zone" cx="220" cy="150" rx="60" ry="20"/>
-          <text x="220" y="150" class="zone-label" text-anchor="middle" dy="6">Z2</text>
+          <!-- Top-left -->
+          <ellipse id="Z2" class="zone" cx="285" cy="150" rx="55" ry="20"/>
+          <text x="285" y="150" class="zone-label" text-anchor="middle" dy="6">Z2</text>
 
-          <ellipse id="Z3" class="zone" cx="360" cy="140" rx="60" ry="20"/>
-          <text x="360" y="140" class="zone-label" text-anchor="middle" dy="6">Z3</text>
+          <!-- Top -->
+          <ellipse id="Z3" class="zone" cx="360" cy="135" rx="55" ry="20"/>
+          <text x="360" y="135" class="zone-label" text-anchor="middle" dy="6">Z3</text>
 
-          <ellipse id="Z4" class="zone" cx="500" cy="150" rx="60" ry="20"/>
-          <text x="500" y="150" class="zone-label" text-anchor="middle" dy="6">Z4</text>
+          <!-- Top-right -->
+          <ellipse id="Z4" class="zone" cx="435" cy="150" rx="55" ry="20"/>
+          <text x="435" y="150" class="zone-label" text-anchor="middle" dy="6">Z4</text>
 
-          <ellipse id="Z5" class="zone" cx="560" cy="210" rx="60" ry="20"/>
-          <text x="560" y="210" class="zone-label" text-anchor="middle" dy="6">Z5</text>
+          <!-- Right -->
+          <ellipse id="Z5" class="zone" cx="480" cy="210" rx="55" ry="20"/>
+          <text x="480" y="210" class="zone-label" text-anchor="middle" dy="6">Z5</text>
 
-          <ellipse id="Z6" class="zone" cx="500" cy="270" rx="60" ry="20"/>
-          <text x="500" y="270" class="zone-label" text-anchor="middle" dy="6">Z6</text>
+          <!-- Bottom-right -->
+          <ellipse id="Z6" class="zone" cx="435" cy="270" rx="55" ry="20"/>
+          <text x="435" y="270" class="zone-label" text-anchor="middle" dy="6">Z6</text>
 
-          <ellipse id="Z7" class="zone" cx="360" cy="280" rx="60" ry="20"/>
-          <text x="360" y="280" class="zone-label" text-anchor="middle" dy="6">Z7</text>
+          <!-- Bottom -->
+          <ellipse id="Z7" class="zone" cx="360" cy="285" rx="55" ry="20"/>
+          <text x="360" y="285" class="zone-label" text-anchor="middle" dy="6">Z7</text>
 
-          <ellipse id="Z8" class="zone" cx="220" cy="270" rx="60" ry="20"/>
-          <text x="220" y="270" class="zone-label" text-anchor="middle" dy="6">Z8</text>
+          <!-- Bottom-left -->
+          <ellipse id="Z8" class="zone" cx="285" cy="270" rx="55" ry="20"/>
+          <text x="285" y="270" class="zone-label" text-anchor="middle" dy="6">Z8</text>
         </g>
+
 
 
         <!-- Pulse circles for each zone -->
+        <!-- Pulse circles (matched to zones) -->
         <g id="pulseGroup" pointer-events="none">
-          <circle id="pulse-Z1" cx="160" cy="210" r="60" class="pulse-circle" style="--cx:160px; --cy:210px; display:none;"/>
-          <circle id="pulse-Z2" cx="220" cy="150" r="60" class="pulse-circle" style="--cx:220px; --cy:150px; display:none;"/>
-          <circle id="pulse-Z3" cx="360" cy="140" r="60" class="pulse-circle" style="--cx:360px; --cy:140px; display:none;"/>
-          <circle id="pulse-Z4" cx="500" cy="150" r="60" class="pulse-circle" style="--cx:500px; --cy:150px; display:none;"/>
-          <circle id="pulse-Z5" cx="560" cy="210" r="60" class="pulse-circle" style="--cx:560px; --cy:210px; display:none;"/>
-          <circle id="pulse-Z6" cx="500" cy="270" r="60" class="pulse-circle" style="--cx:500px; --cy:270px; display:none;"/>
-          <circle id="pulse-Z7" cx="360" cy="280" r="60" class="pulse-circle" style="--cx:360px; --cy:280px; display:none;"/>
-          <circle id="pulse-Z8" cx="220" cy="270" r="60" class="pulse-circle" style="--cx:220px; --cy:270px; display:none;"/>
+          <circle id="pulse-Z1" cx="240" cy="210" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:240px; --cy:210px; display:none;"/>
+          <circle id="pulse-Z2" cx="285" cy="150" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:285px; --cy:150px; display:none;"/>
+          <circle id="pulse-Z3" cx="360" cy="135" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:360px; --cy:135px; display:none;"/>
+          <circle id="pulse-Z4" cx="435" cy="150" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:435px; --cy:150px; display:none;"/>
+          <circle id="pulse-Z5" cx="480" cy="210" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:480px; --cy:210px; display:none;"/>
+          <circle id="pulse-Z6" cx="435" cy="270" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:435px; --cy:270px; display:none;"/>
+          <circle id="pulse-Z7" cx="360" cy="285" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:360px; --cy:285px; display:none;"/>
+          <circle id="pulse-Z8" cx="285" cy="270" r="30" 
+                  class="pulse-circle" 
+                  style="--cx:285px; --cy:270px; display:none;"/>
         </g>
+
 
 
 
