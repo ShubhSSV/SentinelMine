@@ -29,19 +29,20 @@
     .zone.highlight-yellow { fill: rgba(241,196,15,0.55); filter: drop-shadow(0 6px 14px rgba(241,196,15,0.18)); transform: scale(1.03); }
     .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
 
-    /* PULSE: dramatic expanding effect (outer → inner collapse look) */
-    @keyframes pulse-inward {
-      0%   { transform: scale(0.6); opacity: 0.8; }
-      50%  { transform: scale(1.4); opacity: 0.5; }
-      100% { transform: scale(2.0); opacity: 0; }
+    /* PULSE: expand at zone → drift inward to pit center */
+    @keyframes pulse-to-center {
+      0%   { transform: scale(0.8) translate(0,0); opacity: 0.8; }
+      50%  { transform: scale(1.4) translate(calc((360px - var(--cx)) * 0.3), calc((210px - var(--cy)) * 0.3)); opacity: 0.5; }
+      100% { transform: scale(1.8) translate(calc((360px - var(--cx))), calc((210px - var(--cy)))); opacity: 0; }
     }
 
     .pulse-circle {
       fill: rgba(231,76,60,0.28);
       transform-origin: center;
-      animation: pulse-inward 2.2s infinite ease-out;
-      filter: drop-shadow(0 0 8px rgba(231,76,60,0.6));
+      animation: pulse-to-center 2.4s infinite ease-in-out;
+      filter: drop-shadow(0 0 10px rgba(231,76,60,0.65));
     }
+
 
 
 
@@ -103,37 +104,61 @@
           <ellipse cx="360" cy="210" rx="70" ry="20" fill="#9ea7aa"/>
 
           <!-- Zones - repositioned coordinates for better alignment with terraces -->
-          <!-- Zones - aligned to terraces -->
+          <!-- Zones aligned to terraces -->
           <g id="zonesGroup" aria-hidden="false">
-            <ellipse id="Z1" class="zone" cx="200" cy="220" rx="75" ry="26"/>
-            <text x="200" y="220" class="zone-label" text-anchor="middle" dy="4">Z1</text>
+            <!-- Left mid terrace -->
+            <ellipse id="Z1" class="zone" cx="250" cy="220" rx="65" ry="20"/>
+            <text x="250" y="220" class="zone-label" text-anchor="middle" dy="4">Z1</text>
 
-            <ellipse id="Z2" class="zone" cx="360" cy="150" rx="80" ry="26"/>
-            <text x="360" y="150" class="zone-label" text-anchor="middle" dy="4">Z2</text>
+            <!-- Top left -->
+            <ellipse id="Z2" class="zone" cx="300" cy="140" rx="70" ry="18"/>
+            <text x="300" y="140" class="zone-label" text-anchor="middle" dy="4">Z2</text>
 
-            <ellipse id="Z3" class="zone" cx="520" cy="220" rx="75" ry="26"/>
-            <text x="520" y="220" class="zone-label" text-anchor="middle" dy="4">Z3</text>
+            <!-- Right mid terrace -->
+            <ellipse id="Z3" class="zone" cx="470" cy="220" rx="65" ry="20"/>
+            <text x="470" y="220" class="zone-label" text-anchor="middle" dy="4">Z3</text>
 
-            <ellipse id="Z4" class="zone" cx="280" cy="280" rx="110" ry="34"/>
+            <!-- Bottom left -->
+            <ellipse id="Z4" class="zone" cx="280" cy="280" rx="90" ry="28"/>
             <text x="280" y="280" class="zone-label" text-anchor="middle" dy="4">Z4</text>
 
-            <ellipse id="Z5" class="zone" cx="440" cy="280" rx="110" ry="34"/>
+            <!-- Bottom right -->
+            <ellipse id="Z5" class="zone" cx="440" cy="280" rx="90" ry="28"/>
             <text x="440" y="280" class="zone-label" text-anchor="middle" dy="4">Z5</text>
 
-            <ellipse id="Z6" class="zone" cx="360" cy="110" rx="56" ry="18"/>
-            <text x="360" y="110" class="zone-label" text-anchor="middle" dy="4">Z6</text>
+            <!-- Inner top center -->
+            <ellipse id="Z6" class="zone" cx="360" cy="100" rx="50" ry="16"/>
+            <text x="360" y="100" class="zone-label" text-anchor="middle" dy="4">Z6</text>
           </g>
 
-
-          <!-- Pulse circles (hidden by default) - matched to new zone positions -->
+          <!-- Pulse circles (start at zone, animate inward) -->
           <g id="pulseGroup" pointer-events="none">
-            <circle id="pulse-Z1" cx="200" cy="220" r="75" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z2" cx="360" cy="150" r="80" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z3" cx="520" cy="220" r="75" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z4" cx="280" cy="280" r="110" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z5" cx="440" cy="280" r="110" class="pulse-circle" style="display:none;"/>
-            <circle id="pulse-Z6" cx="360" cy="110" r="56" class="pulse-circle" style="display:none;"/>
+            <circle id="pulse-Z1" cx="250" cy="220" r="65" 
+                    class="pulse-circle" 
+                    style="--cx:250px; --cy:220px; display:none;"/>
+                    
+            <circle id="pulse-Z2" cx="300" cy="140" r="70" 
+                    class="pulse-circle" 
+                    style="--cx:300px; --cy:140px; display:none;"/>
+                    
+            <circle id="pulse-Z3" cx="470" cy="220" r="65" 
+                    class="pulse-circle" 
+                    style="--cx:470px; --cy:220px; display:none;"/>
+                    
+            <circle id="pulse-Z4" cx="280" cy="280" r="90" 
+                    class="pulse-circle" 
+                    style="--cx:280px; --cy:280px; display:none;"/>
+                    
+            <circle id="pulse-Z5" cx="440" cy="280" r="90" 
+                    class="pulse-circle" 
+                    style="--cx:440px; --cy:280px; display:none;"/>
+                    
+            <circle id="pulse-Z6" cx="360" cy="100" r="50" 
+                    class="pulse-circle" 
+                    style="--cx:360px; --cy:100px; display:none;"/>
           </g>
+
+
 
         </svg>
       </div>
