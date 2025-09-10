@@ -93,46 +93,38 @@
         <ellipse cx="360" cy="210" rx="70" ry="20" fill="#9ea7aa"/>
         <!-- Zones, precisely aligned over each terrace -->
         <g id="zonesGroup" aria-hidden="false">
-          <!-- Left, 3rd terrace -->
-          <ellipse id="Z1" class="zone" cx="220" cy="210" rx="70" ry="21"/>
-          <text x="220" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
-          <!-- Top (above center), 3rd terrace -->
-          <ellipse id="Z2" class="zone" cx="360" cy="110" rx="70" ry="18"/>
-          <text x="360" y="110" class="zone-label" text-anchor="middle" dy="4">Z2</text>
-          <!-- Right, 3rd terrace -->
-          <ellipse id="Z3" class="zone" cx="500" cy="210" rx="70" ry="21"/>
-          <text x="500" y="210" class="zone-label" text-anchor="middle" dy="4">Z3</text>
-          <!-- Bottom left, 2nd terrace -->
-          <ellipse id="Z4" class="zone" cx="280" cy="290" rx="90" ry="27"/>
-          <text x="280" y="290" class="zone-label" text-anchor="middle" dy="4">Z4</text>
-          <!-- Bottom right, 2nd terrace -->
-          <ellipse id="Z5" class="zone" cx="440" cy="290" rx="90" ry="27"/>
-          <text x="440" y="290" class="zone-label" text-anchor="middle" dy="4">Z5</text>
-          <!-- Center inner pit, matches innermost terrace -->
-          <ellipse id="Z6" class="zone" cx="360" cy="210" rx="55" ry="16"/>
-          <text x="360" y="210" class="zone-label" text-anchor="middle" dy="4">Z6</text>
+          <!-- Z1: Left middle -->
+          <ellipse id="Z1" class="zone" cx="198" cy="210" rx="62" ry="17"/>
+          <text x="198" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
+          <!-- Z3: Right middle -->
+          <ellipse id="Z3" class="zone" cx="522" cy="210" rx="62" ry="17"/>
+          <text x="522" y="210" class="zone-label" text-anchor="middle" dy="4">Z3</text>
+
+          <!-- Z4: Left bottom -->
+          <ellipse id="Z4" class="zone" cx="250" cy="276" rx="62" ry="17"/>
+          <text x="250" y="276" class="zone-label" text-anchor="middle" dy="4">Z4</text>
+          <!-- Z5: Right bottom -->
+          <ellipse id="Z5" class="zone" cx="470" cy="276" rx="62" ry="17"/>
+          <text x="470" y="276" class="zone-label" text-anchor="middle" dy="4">Z5</text>
+
+          <!-- Z2: Top left -->
+          <ellipse id="Z2" class="zone" cx="260" cy="135" rx="62" ry="17"/>
+          <text x="260" y="135" class="zone-label" text-anchor="middle" dy="4">Z2</text>
+          <!-- Z6: Top right -->
+          <ellipse id="Z6" class="zone" cx="460" cy="135" rx="62" ry="17"/>
+          <text x="460" y="135" class="zone-label" text-anchor="middle" dy="4">Z6</text>
         </g>
+
         <!-- Pulse circles (update these if pulse needed) -->
         <g id="pulseGroup" pointer-events="none">
-          <circle id="pulse-Z1" cx="220" cy="210" r="70"
-                  class="pulse-circle"
-                  style="--cx:220px; --cy:210px; display:none;"/>
-          <circle id="pulse-Z2" cx="360" cy="110" r="70"
-                  class="pulse-circle"
-                  style="--cx:360px; --cy:110px; display:none;"/>
-          <circle id="pulse-Z3" cx="500" cy="210" r="70"
-                  class="pulse-circle"
-                  style="--cx:500px; --cy:210px; display:none;"/>
-          <circle id="pulse-Z4" cx="280" cy="290" r="90"
-                  class="pulse-circle"
-                  style="--cx:280px; --cy:290px; display:none;"/>
-          <circle id="pulse-Z5" cx="440" cy="290" r="90"
-                  class="pulse-circle"
-                  style="--cx:440px; --cy:290px; display:none;"/>
-          <circle id="pulse-Z6" cx="360" cy="210" r="55"
-                  class="pulse-circle"
-                  style="--cx:360px; --cy:210px; display:none;"/>
+          <circle id="pulse-Z1" cx="198" cy="210" r="62" class="pulse-circle" style="--cx:198px; --cy:210px; display:none;"/>
+          <circle id="pulse-Z3" cx="522" cy="210" r="62" class="pulse-circle" style="--cx:522px; --cy:210px; display:none;"/>
+          <circle id="pulse-Z4" cx="250" cy="276" r="62" class="pulse-circle" style="--cx:250px; --cy:276px; display:none;"/>
+          <circle id="pulse-Z5" cx="470" cy="276" r="62" class="pulse-circle" style="--cx:470px; --cy:276px; display:none;"/>
+          <circle id="pulse-Z2" cx="260" cy="135" r="62" class="pulse-circle" style="--cx:260px; --cy:135px; display:none;"/>
+          <circle id="pulse-Z6" cx="460" cy="135" r="62" class="pulse-circle" style="--cx:460px; --cy:135px; display:none;"/>
         </g>
+
       </svg>
    </div>
 
