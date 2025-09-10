@@ -30,18 +30,19 @@
     .zone.highlight-red { fill: rgba(231,76,60,0.65); filter: drop-shadow(0 8px 18px rgba(231,76,60,0.22)); transform: scale(1.06); }
 
     /* New animation: expand + slight inward drift */
-    @keyframes pulse-slide-inward {
+    @keyframes pulse-landslide {
       0%   { transform: scale(0.6) translate(0,0); opacity: 0.9; }
-      50%  { transform: scale(1.2) translate(calc((360px - var(--cx)) * 0.1), calc((210px - var(--cy)) * 0.1)); opacity: 0.6; }
-      100% { transform: scale(1.8) translate(calc((360px - var(--cx)) * 0.15), calc((210px - var(--cy)) * 0.15)); opacity: 0; }
+      50%  { transform: scale(1.2) translate(calc((360px - var(--cx)) * 0.08), calc((210px - var(--cy)) * 0.08)); opacity: 0.6; }
+      100% { transform: scale(1.6) translate(calc((360px - var(--cx)) * 0.15), calc((210px - var(--cy)) * 0.15)); opacity: 0; }
     }
 
     .pulse-circle {
       fill: rgba(231,76,60,0.28);
       transform-origin: center;
-      animation: pulse-slide-inward 2.4s infinite ease-out;
+      animation: pulse-landslide 2.4s infinite ease-out;
       filter: drop-shadow(0 0 10px rgba(231,76,60,0.65));
     }
+
 
 
 
@@ -106,32 +107,34 @@
 
           <!-- Zones - repositioned coordinates for better alignment with terraces -->
           <!-- Zones aligned to terraces -->
+          
           <!-- Zones aligned to terraces -->
           <g id="zonesGroup">
-            <!-- Left mid terrace -->
-            <ellipse id="Z1" class="zone" cx="200" cy="210" rx="60" ry="18"/>
-            <text x="200" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
+            <!-- Left outer terrace -->
+            <ellipse id="Z1" class="zone" cx="150" cy="210" rx="55" ry="18"/>
+            <text x="150" y="210" class="zone-label" text-anchor="middle" dy="4">Z1</text>
 
             <!-- Top left -->
-            <ellipse id="Z2" class="zone" cx="270" cy="140" rx="70" ry="16"/>
-            <text x="270" y="140" class="zone-label" text-anchor="middle" dy="4">Z2</text>
+            <ellipse id="Z2" class="zone" cx="260" cy="130" rx="60" ry="16"/>
+            <text x="260" y="130" class="zone-label" text-anchor="middle" dy="4">Z2</text>
 
-            <!-- Right mid terrace -->
-            <ellipse id="Z3" class="zone" cx="520" cy="210" rx="60" ry="18"/>
-            <text x="520" y="210" class="zone-label" text-anchor="middle" dy="4">Z3</text>
+            <!-- Right outer terrace -->
+            <ellipse id="Z3" class="zone" cx="570" cy="210" rx="55" ry="18"/>
+            <text x="570" y="210" class="zone-label" text-anchor="middle" dy="4">Z3</text>
 
             <!-- Bottom left -->
-            <ellipse id="Z4" class="zone" cx="260" cy="280" rx="80" ry="22"/>
+            <ellipse id="Z4" class="zone" cx="260" cy="280" rx="75" ry="22"/>
             <text x="260" y="280" class="zone-label" text-anchor="middle" dy="4">Z4</text>
 
             <!-- Bottom right -->
-            <ellipse id="Z5" class="zone" cx="460" cy="280" rx="80" ry="22"/>
+            <ellipse id="Z5" class="zone" cx="460" cy="280" rx="75" ry="22"/>
             <text x="460" y="280" class="zone-label" text-anchor="middle" dy="4">Z5</text>
 
             <!-- Inner top center -->
-            <ellipse id="Z6" class="zone" cx="360" cy="110" rx="50" ry="14"/>
-            <text x="360" y="110" class="zone-label" text-anchor="middle" dy="4">Z6</text>
+            <ellipse id="Z6" class="zone" cx="360" cy="120" rx="45" ry="14"/>
+            <text x="360" y="120" class="zone-label" text-anchor="middle" dy="4">Z6</text>
           </g>
+
 
 
           <!-- Pulse circles (start at zone, animate inward) -->
@@ -390,3 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
+
+
+
