@@ -45,20 +45,31 @@
     }
 
 
-    /* pulse: expand slightly AND drift inward toward pit center */
-    @keyframes pulse-landslide {
-      0%   { transform: scale(0.7) translate(0,0); opacity: 0.9; }
-      45%  { transform: scale(1.05) translate(calc((360px - var(--cx)) * 0.05), calc((210px - var(--cy)) * 0.05)); opacity: 0.65; }
-      100% { transform: scale(1.35) translate(calc((360px - var(--cx)) * 0.12), calc((210px - var(--cy)) * 0.12)); opacity: 0; }
+    /* Fix pulse so it starts at zone center and drifts inward */
+    @keyframes pulse-to-center {
+      0% {
+        r: 0;                /* start as pinpoint */
+        opacity: 0.9;
+        transform: translate(0,0);
+      }
+      100% {
+        r: 40px;             /* expand smoothly */
+        opacity: 0;
+        transform: translate(
+          calc(360px - var(--cx)),
+          calc(210px - var(--cy))
+        );                   /* drift inward to pit center */
+      }
     }
 
-    .pulse-circle {
-      fill: rgba(231,76,60,0.22);
-      transform-origin: center;
-      animation: pulse-landslide 2.6s infinite ease-out;
-      filter: drop-shadow(0 0 8px rgba(231,76,60,0.45));
-      pointer-events: none;
-    }
+.pulse-circle {
+  fill: rgba(231,76,60,0.35);
+  transform-origin: center;
+  animation: pulse-to-center 2.4s infinite ease-out;
+  filter: drop-shadow(0 0 6px rgba(231,76,60,0.5));
+  pointer-events: none;
+}
+
 
     .all-clear-badge { display:inline-block; padding:6px 10px; border-radius:8px; background:rgba(39,174,96,0.12); color:#27ae60; font-weight:600; margin-top:6px; }
     .minimap-wrap { margin-top:12px; }
