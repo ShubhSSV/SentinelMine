@@ -108,18 +108,39 @@ if DATA_CSV.exists():
                     minmax_map[f] = {"min": 0.0, "max": 1.0}
 
             # If all correlations zero, fall back to uniform weights
+            # --- Balanced weights: correlations + domain boost ---
             abs_corrs = {f: abs(v) for f, v in corr_map.items()}
             total = sum(abs_corrs.values())
+
             if total <= 0:
-                # uniform
+                # fallback to uniform
                 n = len(numeric_feats) if numeric_feats else 1
                 for f in numeric_feats:
                     feature_weights[f] = 1.0 / n
                     feature_sign[f] = 1
             else:
-                for f, v in abs_corrs.items():
-                    feature_weights[f] = v / total
+                # base weights from correlations
+                raw_weights = {f: v / total for f, v in abs_corrs.items()}
+
+                # domain-driven boost (ensures key features matter)
+                BOOSTS = {
+                    "Rainfall_mm": 1.5,
+                    "Slope_Angle": 1.3,
+                    "Soil_Saturation": 1.4,
+                    "Earthquake_Activity": 1.2,
+                }
+
+                boosted = {}
+                for f, w in raw_weights.items():
+                    factor = BOOSTS.get(f, 1.0)
+                    boosted[f] = w * factor
                     feature_sign[f] = 1 if corr_map[f] >= 0 else -1
+
+                # normalize again so weights sum to 1
+                total_boosted = sum(boosted.values())
+                for f, w in boosted.items():
+                    feature_weights[f] = w / total_boosted
+
             print("✅ Derived demo weights from correlations:", feature_weights)
         else:
             # Target not present - fallback to uniform
