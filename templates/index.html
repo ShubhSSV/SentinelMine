@@ -281,13 +281,48 @@ function renderFullHistory(){
   if (fullHistory.length === 0) {
     const li = document.createElement('li'); li.className='list-group-item small-muted'; li.innerText='No history available'; full.appendChild(li); return;
   }
+
+
   fullHistory.forEach(it=>{
-    const li = document.createElement('li'); li.className='list-group-item';
-    const dbg = JSON.stringify(it.debug||{}, null, 2);
-    li.innerHTML = `<div class="d-flex justify-content-between"><div><strong>${it.ts}</strong> → ${it.alert} <small class="small-muted">(${(it.prob*100).toFixed(1)}%)</small></div><div><small class="small-muted">${it.message}</small></div></div><pre class="debug-box mt-2">${dbg}</pre>`;
+    const li = document.createElement('li'); 
+    li.className = 'list-group-item';
+
+    // Top factor formatter
+    function getTopFactors(weights, topN=3){
+      if (!weights) return [];
+      return Object.entries(weights)
+        .sort((a,b)=>b[1]-a[1])   // sort by weight
+        .slice(0, topN)           // take top N
+        .map(([k,v]) => `${k.replace(/_/g,' ')} (${(v*100).toFixed(1)}%)`);
+    }
+
+    li.innerHTML = `
+      <div class="p-3 mb-3 rounded shadow-sm" 
+          style="background:${it.alert==='RED' ? '#fdecea' : it.alert==='YELLOW' ? '#fff8e1' : '#eafaf1'};">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <strong>${it.ts}</strong> → 
+            <span style="font-weight:700; color:${it.alert==='RED' ? '#e74c3c' : it.alert==='YELLOW' ? '#f39c12' : '#27ae60'};">
+              ${it.alert}
+            </span> 
+            <small class="small-muted">(${(it.prob*100).toFixed(1)}%)</small>
+          </div>
+          <div><small class="text-muted">${it.message}</small></div>
+        </div>
+
+        <div class="mt-2 small">
+          <strong>Final Probability:</strong> ${(it.debug?.final_proba*100 || it.prob*100).toFixed(2)}%
+          <br>
+          <strong>Top Factors:</strong>
+          <ul class="mb-0 mt-1">
+            ${getTopFactors(it.debug?.weights).map(f => `<li>${f}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
     full.appendChild(li);
   });
-}
+
 
 // Clear history
 document.addEventListener('DOMContentLoaded', () => {
