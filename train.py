@@ -3,15 +3,15 @@ import json
 from pathlib import Path
 import pandas as pd
 import joblib
+import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
 
 def main(csv_path, target_col, model_out_dir="model_out"):
     # -------------------------------
@@ -19,9 +19,7 @@ def main(csv_path, target_col, model_out_dir="model_out"):
     # -------------------------------
     print(f"Loaded CSV: {csv_path}")
     df = pd.read_csv(csv_path)
-    print(f"Shape: {df.shape}")
-    print(f"Available columns: {list(df.columns)}")
-
+    
     if target_col not in df.columns:
         raise ValueError(f"Target column '{target_col}' not found in CSV")
 
@@ -34,9 +32,6 @@ def main(csv_path, target_col, model_out_dir="model_out"):
     numeric_features = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
     categorical_features = X.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
 
-    print("Numeric features:", numeric_features)
-    print("Categorical features:", categorical_features)
-
     # -------------------------------
     # Preprocessing
     # -------------------------------
@@ -45,7 +40,6 @@ def main(csv_path, target_col, model_out_dir="model_out"):
         ("scaler", StandardScaler())
     ])
 
-    # ✅ FIX: use sparse_output instead of sparse
     categorical_transformer = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="most_frequent")),
         ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
@@ -59,11 +53,20 @@ def main(csv_path, target_col, model_out_dir="model_out"):
     )
 
     # -------------------------------
-    # Pipeline
+    # Model Upgrade: Random Forest
     # -------------------------------
+    # We use 200 trees (n_estimators) to smooth out the predictions.
+    # max_depth=10 prevents the model from overfitting to outliers (like extreme quake values).
+    rf_clf = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=10,
+        random_state=42,
+        n_jobs=-1
+    )
+
     pipeline = Pipeline(steps=[
         ("preprocessor", preprocessor),
-        ("clf", DecisionTreeClassifier(random_state=42))
+        ("clf", rf_clf)
     ])
 
     # -------------------------------
@@ -76,11 +79,13 @@ def main(csv_path, target_col, model_out_dir="model_out"):
     # -------------------------------
     # Train
     # -------------------------------
+    print("Training Random Forest model...")
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
 
     print(f"✅ Model trained. Accuracy = {acc:.3f}")
+    print(classification_report(y_test, y_pred))
 
     # -------------------------------
     # Save Model + Metadata
@@ -110,8 +115,8 @@ def main(csv_path, target_col, model_out_dir="model_out"):
 
     print(f"📦 Model and metadata saved to {out_dir}")
 
-
 if __name__ == "__main__":
+    # Example usage: python train.py landslide_dataset.csv Landslide
     parser = argparse.ArgumentParser()
     parser.add_argument("csv", type=str, help="Path to CSV dataset")
     parser.add_argument("target", type=str, help="Target column name")
